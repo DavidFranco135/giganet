@@ -19,15 +19,14 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode; role?: 
     </div>
   );
 
-  if (!user) return <Navigate to="/login" />;
+  if (!user) return <Navigate to="/login" replace />;
 
-  // Se o usuário está logado mas o perfil ainda não existe no Firestore
   if (!profile) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4 text-center">
         <h2 className="text-xl font-bold text-slate-900 mb-2">Perfil não encontrado</h2>
         <p className="text-slate-500 mb-6">Não conseguimos carregar seus dados de acesso. Tente sair e entrar novamente.</p>
-        <button 
+        <button
           onClick={() => auth.signOut()}
           className="px-6 py-2 bg-primary text-white rounded-xl font-medium"
         >
@@ -37,11 +36,28 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode; role?: 
     );
   }
 
+  // Redireciona para a área correta se o role não bater
   if (role && profile.tipo !== role) {
-    return <Navigate to={profile.tipo === 'admin' ? '/admin' : '/'} />;
+    return <Navigate to={profile.tipo === 'admin' ? '/admin' : '/'} replace />;
   }
 
   return <>{children}</>;
+};
+
+// Componente que redireciona para a área correta após login
+const RootRedirect = () => {
+  const { user, profile, loading } = useAuth();
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+    </div>
+  );
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (!profile) return <Navigate to="/login" replace />;
+
+  return <Navigate to={profile.tipo === 'admin' ? '/admin' : '/home'} replace />;
 };
 
 export default function App() {
@@ -49,10 +65,14 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
+          {/* Rota raiz — redireciona automaticamente */}
+          <Route path="/" element={<RootRedirect />} />
+
+          {/* Login */}
           <Route path="/login" element={<LoginPage />} />
-          
-          {/* Client Routes */}
-          <Route path="/" element={
+
+          {/* ── Rotas do Cliente ── */}
+          <Route path="/home" element={
             <ProtectedRoute role="client">
               <ClientLayout><ClientHome /></ClientLayout>
             </ProtectedRoute>
@@ -73,14 +93,36 @@ export default function App() {
             </ProtectedRoute>
           } />
 
-          {/* Admin Routes */}
+          {/* ── Rotas do Admin ── */}
           <Route path="/admin" element={
             <ProtectedRoute role="admin">
               <AdminLayout><AdminDashboard /></AdminLayout>
             </ProtectedRoute>
           } />
-          
-          <Route path="*" element={<Navigate to="/" />} />
+          {/* Rotas admin adicionais — adicione as páginas quando criar */}
+          <Route path="/admin/clients" element={
+            <ProtectedRoute role="admin">
+              <AdminLayout><AdminDashboard /></AdminLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/invoices" element={
+            <ProtectedRoute role="admin">
+              <AdminLayout><AdminDashboard /></AdminLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/tickets" element={
+            <ProtectedRoute role="admin">
+              <AdminLayout><AdminDashboard /></AdminLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/settings" element={
+            <ProtectedRoute role="admin">
+              <AdminLayout><AdminDashboard /></AdminLayout>
+            </ProtectedRoute>
+          } />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </AuthProvider>
