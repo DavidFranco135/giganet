@@ -4,13 +4,13 @@ import { Home, CreditCard, Headphones, User, LayoutDashboard, Users, FileText, S
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../lib/firebase';
 import { cn } from '../components/UI';
+import { LOGO_BASE64 } from '../lib/logo';
 
 export const ClientLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-  const { profile } = useAuth();
 
   const navItems = [
-    { icon: Home, label: 'Início', path: '/' },
+    { icon: Home, label: 'Início', path: '/home' },
     { icon: CreditCard, label: 'Financeiro', path: '/finance' },
     { icon: Headphones, label: 'Suporte', path: '/support' },
     { icon: User, label: 'Perfil', path: '/profile' },
@@ -20,13 +20,17 @@ export const ClientLayout: React.FC<{ children: React.ReactNode }> = ({ children
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-0 md:pl-64">
       {/* Desktop Sidebar */}
       <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="p-6">
-          <div className="flex items-center gap-2">
-            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xl">G</div>
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <img
+              src={LOGO_BASE64}
+              alt="GigaNet Telecom"
+              className="h-10 w-10 rounded-full object-cover"
+            />
             <span className="text-xl font-bold text-primary">GigaNet</span>
           </div>
         </div>
-        <nav className="flex-1 space-y-1 px-4">
+        <nav className="flex-1 space-y-1 px-4 pt-4">
           {navItems.map((item) => (
             <Link
               key={item.path}
@@ -92,13 +96,20 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <div className="min-h-screen bg-slate-50 pl-64">
       <aside className="fixed left-0 top-0 flex h-full w-64 flex-col border-r border-slate-200 bg-white">
-        <div className="p-6">
-          <div className="flex items-center gap-2">
-            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xl">G</div>
-            <span className="text-xl font-bold text-primary">GigaNet Admin</span>
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <img
+              src={LOGO_BASE64}
+              alt="GigaNet Telecom"
+              className="h-10 w-10 rounded-full object-cover"
+            />
+            <div>
+              <span className="text-lg font-bold text-primary block leading-tight">GigaNet</span>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Painel Admin</span>
+            </div>
           </div>
         </div>
-        <nav className="flex-1 space-y-1 px-4">
+        <nav className="flex-1 space-y-1 px-4 pt-4">
           {navItems.map((item) => (
             <Link
               key={item.path}
