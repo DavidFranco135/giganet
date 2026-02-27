@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Button, Input, Card } from '../components/UI';
 import { useNavigate } from 'react-router-dom';
+import { LOGO_BASE64 } from '../lib/logo';
 
 export const LoginPage: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -23,24 +24,33 @@ export const LoginPage: React.FC = () => {
       if (isRegistering) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        
-        // Create user profile in Firestore
+        const isAdmin = email === 'giganetadm@gmail.com';
+
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           nome,
           email,
           cpf,
-          tipo: email === 'giganetadm@gmail.com' ? 'admin' : 'client',
+          tipo: isAdmin ? 'admin' : 'client',
           statusConexao: 'offline',
           numeroCliente: Math.floor(100000 + Math.random() * 900000).toString(),
           telefone: '',
           endereco: { rua: '', numero: '', bairro: '', cidade: '', cep: '' }
         });
-        
-        navigate(email === 'giganetadm@gmail.com' ? '/admin' : '/');
+
+        navigate(isAdmin ? '/admin' : '/home', { replace: true });
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
-        navigate('/');
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Busca o perfil para saber o role e redirecionar corretamente
+        const docSnap = await getDoc(doc(db, 'users', user.uid));
+        if (docSnap.exists()) {
+          const profile = docSnap.data();
+          navigate(profile.tipo === 'admin' ? '/admin' : '/home', { replace: true });
+        } else {
+          navigate('/home', { replace: true });
+        }
       }
     } catch (err: any) {
       console.error(err);
@@ -48,6 +58,8 @@ export const LoginPage: React.FC = () => {
         setError('Este e-mail já está em uso.');
       } else if (err.code === 'auth/weak-password') {
         setError('A senha deve ter pelo menos 6 caracteres.');
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('E-mail ou senha incorretos.');
       } else {
         setError('Erro na autenticação. Verifique seus dados.');
       }
@@ -57,11 +69,16 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-primary to-slate-900 p-4">
+      <Card className="w-full max-w-md shadow-2xl">
         <div className="text-center mb-8">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white font-bold text-3xl mb-4 shadow-lg shadow-primary/20">
-            G
+          {/* Logo GigaNet */}
+          <div className="flex justify-center mb-4">
+            <img
+              src={LOGO_BASE64}
+              alt="GigaNet Telecom"
+              className="h-28 w-28 rounded-full object-cover shadow-lg shadow-primary/30 border-4 border-white"
+            />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">GigaNet Telecom</h1>
           <p className="text-slate-500">
@@ -104,17 +121,17 @@ export const LoginPage: React.FC = () => {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-          
-          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+
+          {error && <p className="text-sm text-red-500 text-center bg-red-50 py-2 px-3 rounded-xl">{error}</p>}
 
           <Button type="submit" className="w-full" isLoading={loading}>
             {isRegistering ? 'Criar Conta' : 'Entrar'}
           </Button>
 
           <div className="text-center space-y-2">
-            <button 
-              type="button" 
-              onClick={() => setIsRegistering(!isRegistering)}
+            <button
+              type="button"
+              onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
               className="text-sm text-primary hover:underline block w-full"
             >
               {isRegistering ? 'Já tem uma conta? Entre aqui' : 'Não tem conta? Crie uma agora'}
