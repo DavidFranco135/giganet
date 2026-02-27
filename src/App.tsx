@@ -1,0 +1,71 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ClientLayout, AdminLayout } from './components/Layouts';
+import { LoginPage } from './pages/Login';
+import { ClientHome } from './pages/ClientHome';
+import { FinancePage } from './pages/Finance';
+import { SupportPage } from './pages/Support';
+import { ProfilePage } from './pages/Profile';
+import { AdminDashboard } from './pages/AdminDashboard';
+
+const ProtectedRoute = ({ children, role }: { children: React.ReactNode; role?: 'client' | 'admin' }) => {
+  const { user, profile, loading } = useAuth();
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+    </div>
+  );
+
+  if (!user) return <Navigate to="/login" />;
+
+  if (role && profile?.tipo !== role) {
+    return <Navigate to={profile?.tipo === 'admin' ? '/admin' : '/'} />;
+  }
+
+  return <>{children}</>;
+};
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          
+          {/* Client Routes */}
+          <Route path="/" element={
+            <ProtectedRoute role="client">
+              <ClientLayout><ClientHome /></ClientLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/finance" element={
+            <ProtectedRoute role="client">
+              <ClientLayout><FinancePage /></ClientLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/support" element={
+            <ProtectedRoute role="client">
+              <ClientLayout><SupportPage /></ClientLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute role="client">
+              <ClientLayout><ProfilePage /></ClientLayout>
+            </ProtectedRoute>
+          } />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={
+            <ProtectedRoute role="admin">
+              <AdminLayout><AdminDashboard /></AdminLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
+}
