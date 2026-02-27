@@ -158,81 +158,211 @@ const TabNotificacoes: React.FC = () => {
   );
 };
 
-// ─── Aba: Integrações ────────────────────────────────────────────
+// ─── Aba: Integrações (IXC Soft) ─────────────────────────────────
 const TabIntegracoes: React.FC = () => {
-  const [asaasKey, setAsaasKey] = useState('');
-  const [mikrotikIp, setMikrotikIp] = useState('');
-  const [mikrotikUser, setMikrotikUser] = useState('admin');
-  const [mikrotikPass, setMikrotikPass] = useState('');
-  const [testStatus, setTestStatus] = useState<Record<string, 'idle' | 'ok' | 'error'>>({
-    asaas: 'idle', mikrotik: 'idle',
-  });
+  const [ixcUrl, setIxcUrl]       = useState('');
+  const [ixcToken, setIxcToken]   = useState('');
+  const [showToken, setShowToken] = useState(false);
+  const [testing, setTesting]     = useState(false);
+  const [saved, setSaved]         = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'ok' | 'error'>('idle');
+  const [testMsg, setTestMsg]     = useState('');
 
-  const testConnection = (service: string) => {
-    setTestStatus(prev => ({ ...prev, [service]: 'idle' }));
-    setTimeout(() => {
-      // Simulação — em produção chamar o endpoint real
-      setTestStatus(prev => ({ ...prev, [service]: asaasKey || mikrotikIp ? 'ok' : 'error' }));
-    }, 1200);
+  // URL do webhook — em produção vem do domínio real
+  const webhookUrl = `${window.location.origin}/api/webhooks/ixc`;
+
+  const handleCopyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl);
+  };
+
+  const handleTest = async () => {
+    if (!ixcUrl || !ixcToken) {
+      setTestStatus('error');
+      setTestMsg('Preencha a URL e o Token antes de testar.');
+      return;
+    }
+    setTesting(true);
+    setTestStatus('idle');
+    try {
+      // Chama o endpoint do próprio servidor que testa a conexão com o IXC
+      const res = await fetch('/api/ixc/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ixcUrl, ixcToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setTestStatus('ok');
+        setTestMsg(`Conectado! Versão IXC: ${data.version || 'detectada'}`);
+      } else {
+        setTestStatus('error');
+        setTestMsg(data.error || 'Falha na conexão. Verifique a URL e o Token.');
+      }
+    } catch {
+      setTestStatus('error');
+      setTestMsg('Não foi possível alcançar o servidor IXC.');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = () => {
+    // Em produção: salvar no Firestore ou enviar para o servidor atualizar o .env
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
   };
 
   return (
     <div className="space-y-6">
-      {/* Asaas */}
+
+      {/* Card principal IXC */}
       <Card className="space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-lg">A</div>
-          <div>
-            <h3 className="font-bold text-slate-900">Asaas — Pagamentos</h3>
-            <p className="text-xs text-slate-500">PIX, Boleto e Cartão automatizados</p>
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-200">
+            <span className="text-white font-black text-lg">IX</span>
           </div>
+          <div>
+            <h3 className="font-bold text-slate-900 text-base">IXC Soft — ERP do Provedor</h3>
+            <p className="text-xs text-slate-500">Sincroniza clientes, faturas, status de conexão e desbloqueios</p>
+          </div>
+          {testStatus === 'ok' && (
+            <span className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Conectado
+            </span>
+          )}
         </div>
-        <Input
-          label="API Key do Asaas"
-          placeholder="$aact_xxxxxxxxxxxxxxxxxxxx"
-          value={asaasKey}
-          onChange={e => setAsaasKey(e.target.value)}
-        />
-        <Input label="Webhook URL (cole no painel Asaas)" defaultValue="https://SEU-DOMINIO.com/api/webhooks/asaas" readOnly />
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => testConnection('asaas')} className="gap-2">
-            <Link className="h-4 w-4" /> Testar Conexão
+
+        <div className="h-px bg-slate-100" />
+
+        {/* Campos */}
+        <div className="space-y-4">
+          <Input
+            label="URL do Servidor IXC"
+            placeholder="https://ixc.suaempresa.com.br"
+            value={ixcUrl}
+            onChange={e => setIxcUrl(e.target.value)}
+          />
+          <p className="text-xs text-slate-400 -mt-2">
+            Endereço que você usa para acessar o IXC no navegador, sem barra no final.
+          </p>
+
+          <div className="relative">
+            <Input
+              label="Token de Acesso"
+              type={showToken ? 'text' : 'password'}
+              placeholder="Cole aqui o token gerado no IXC"
+              value={ixcToken}
+              onChange={e => setIxcToken(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowToken(v => !v)}
+              className="absolute right-3 top-8 text-xs text-slate-400 hover:text-primary transition-colors"
+            >
+              {showToken ? 'Ocultar' : 'Mostrar'}
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 -mt-2">
+            No IXC: <span className="font-medium text-slate-600">Configurações → Usuários → [usuário api] → Token de acesso</span>
+          </p>
+        </div>
+
+        {/* Resultado do teste */}
+        {testStatus !== 'idle' && (
+          <div className={cn(
+            'flex items-center gap-3 p-3 rounded-xl text-sm font-medium',
+            testStatus === 'ok'
+              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
+          )}>
+            {testStatus === 'ok'
+              ? <CheckCircle className="h-4 w-4 flex-shrink-0" />
+              : <AlertCircle className="h-4 w-4 flex-shrink-0" />}
+            {testMsg}
+          </div>
+        )}
+
+        {/* Ações */}
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTest}
+            isLoading={testing}
+            className="gap-2"
+          >
+            <Link className="h-4 w-4" />
+            {testing ? 'Testando...' : 'Testar Conexão'}
           </Button>
-          {testStatus.asaas === 'ok' && <span className="flex items-center gap-1 text-emerald-600 text-sm font-medium"><CheckCircle className="h-4 w-4" /> Conectado</span>}
-          {testStatus.asaas === 'error' && <span className="flex items-center gap-1 text-red-500 text-sm font-medium"><AlertCircle className="h-4 w-4" /> Falhou — verifique a chave</span>}
+          <Button onClick={handleSave} size="sm" className="gap-2 ml-auto">
+            {saved
+              ? <><CheckCircle className="h-4 w-4" /> Salvo!</>
+              : <><Save className="h-4 w-4" /> Salvar</>}
+          </Button>
         </div>
       </Card>
 
-      {/* Mikrotik */}
-      <Card className="space-y-5">
+      {/* Card Webhook */}
+      <Card className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 font-bold text-lg">M</div>
+          <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600">
+            <Link className="h-5 w-5" />
+          </div>
           <div>
-            <h3 className="font-bold text-slate-900">Mikrotik / ERP — Status de Conexão</h3>
-            <p className="text-xs text-slate-500">Consulta status online/offline/bloqueado do cliente</p>
+            <h3 className="font-bold text-slate-900">Webhook — Notificações Automáticas</h3>
+            <p className="text-xs text-slate-500">O IXC avisa o app quando um cliente é bloqueado ou paga uma fatura</p>
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Input label="IP do Servidor / API" placeholder="192.168.0.1" value={mikrotikIp} onChange={e => setMikrotikIp(e.target.value)} />
-          <Input label="Porta" placeholder="8728" defaultValue="8728" />
-          <Input label="Usuário" placeholder="admin" value={mikrotikUser} onChange={e => setMikrotikUser(e.target.value)} />
-          <Input label="Senha" type="password" placeholder="••••••••" value={mikrotikPass} onChange={e => setMikrotikPass(e.target.value)} />
+
+        <div className="p-4 bg-slate-50 rounded-xl space-y-2">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">URL para cadastrar no IXC</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 break-all">
+              {webhookUrl}
+            </code>
+            <button
+              onClick={handleCopyWebhook}
+              className="h-9 w-9 flex-shrink-0 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 transition-colors"
+              title="Copiar URL"
+            >
+              <CheckCircle className="h-4 w-4 text-slate-500" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => testConnection('mikrotik')} className="gap-2">
-            <Link className="h-4 w-4" /> Testar Conexão
-          </Button>
-          {testStatus.mikrotik === 'ok' && <span className="flex items-center gap-1 text-emerald-600 text-sm font-medium"><CheckCircle className="h-4 w-4" /> Conectado</span>}
-          {testStatus.mikrotik === 'error' && <span className="flex items-center gap-1 text-red-500 text-sm font-medium"><AlertCircle className="h-4 w-4" /> Falhou — verifique o IP/usuário</span>}
-        </div>
-        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
-          <p className="text-xs text-amber-800 font-medium">⚠️ O servidor Mikrotik deve estar acessível pelo IP público ou via VPN. Veja o guia de integração na aba Integrações do README.</p>
+
+        <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 space-y-1">
+          <p className="text-xs font-semibold text-blue-800">Como cadastrar no IXC:</p>
+          <p className="text-xs text-blue-700">
+            Acesse <span className="font-medium">Configurações → Integrações → Webhooks → Novo</span>, cole a URL acima e selecione os eventos: <span className="font-medium">Bloqueio financeiro, Desbloqueio, Pagamento recebido.</span>
+          </p>
         </div>
       </Card>
 
-      <div className="flex justify-end">
-        <Button className="gap-2"><Save className="h-4 w-4" /> Salvar Integrações</Button>
-      </div>
+      {/* Card o que é sincronizado */}
+      <Card className="space-y-3">
+        <h3 className="font-bold text-slate-900">O que é sincronizado com o IXC</h3>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { label: 'Status de Conexão', desc: 'Online / Offline / Bloqueado', ok: true },
+            { label: 'Faturas', desc: 'Em aberto, pagas e atrasadas', ok: true },
+            { label: 'PIX e Boleto', desc: 'Gerados direto pelo IXC', ok: true },
+            { label: 'Desbloqueio de Confiança', desc: 'Solicitado pelo app', ok: true },
+            { label: 'Dados do Contrato', desc: 'Plano e velocidade', ok: true },
+            { label: 'Bloqueio Automático', desc: 'Via Webhook em tempo real', ok: true },
+          ].map((item, i) => (
+            <div key={i} className="flex items-start gap-2 p-3 rounded-xl bg-slate-50">
+              <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-slate-800">{item.label}</p>
+                <p className="text-[10px] text-slate-500">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
     </div>
   );
 };
