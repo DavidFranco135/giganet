@@ -111,13 +111,13 @@ export const LoginPage: React.FC = () => {
           position: 'relative',
           zIndex: 1,
           // Glassmorphism: branco translúcido quando há fundo, branco sólido sem fundo
-          backgroundColor: loginBgUrl ? 'rgba(255,255,255,0.55)' : 'white',
-          backdropFilter: loginBgUrl ? 'blur(18px) saturate(1.6)' : 'none',
-          WebkitBackdropFilter: loginBgUrl ? 'blur(18px) saturate(1.6)' : 'none',
+          backgroundColor: loginBgUrl ? 'rgba(255,255,255,0.25)' : 'white',
+          backdropFilter: loginBgUrl ? 'blur(12px) saturate(1.4)' : 'none',
+          WebkitBackdropFilter: loginBgUrl ? 'blur(12px) saturate(1.4)' : 'none',
           boxShadow: loginBgUrl
-            ? '0 8px 40px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(255,255,255,0.55)'
+            ? '0 8px 40px rgba(0,0,0,0.15), inset 0 0 0 1px rgba(255,255,255,0.35)'
             : '0 4px 24px rgba(0,0,0,0.08)',
-          border: loginBgUrl ? '1px solid rgba(255,255,255,0.6)' : undefined,
+          border: loginBgUrl ? '1px solid rgba(255,255,255,0.35)' : undefined,
         }}
       >
 
