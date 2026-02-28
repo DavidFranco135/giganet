@@ -10,22 +10,22 @@ export const PlansPage: React.FC = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchPlans();
-  }, []);
+  useEffect(() => { fetchPlans(); }, []);
 
   const fetchPlans = async () => {
     setLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, 'plans'));
-      const plansData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Plan));
-      setPlans(plansData);
+      const snap = await getDocs(collection(db, 'plans'));
+      setPlans(snap.docs.map(d => ({ id: d.id, ...d.data() } as Plan)));
     } catch (error) {
-      console.error('Error fetching plans:', error);
+      console.error('Erro ao buscar planos:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Suporta tanto imagemUrl (novo) quanto imageUrl (legado)
+  const getImage = (plan: Plan) => plan.imagemUrl || plan.imageUrl;
 
   return (
     <div className="space-y-8">
@@ -56,10 +56,15 @@ export const PlansPage: React.FC = () => {
                     Mais Popular
                   </div>
                 )}
-                
+
                 <div className="h-48 bg-slate-100 relative">
-                  {plan.imageUrl ? (
-                    <img src={plan.imageUrl} alt={plan.nome} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                  {getImage(plan) ? (
+                    <img
+                      src={getImage(plan)}
+                      alt={plan.nome}
+                      className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
                   ) : (
                     <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
                       <Wifi className="h-12 w-12 text-primary/30" />
@@ -86,10 +91,10 @@ export const PlansPage: React.FC = () => {
                         <p className="font-bold text-slate-700">{plan.velocidade}</p>
                       </div>
                     </div>
-                    
+
                     <ul className="space-y-3">
-                      {plan.beneficios.map((b, i) => (
-                        <li key={i} className="flex items-start gap-3 text-sm text-slate-600">
+                      {plan.beneficios.map((b, j) => (
+                        <li key={j} className="flex items-start gap-3 text-sm text-slate-600">
                           <div className="mt-1 h-4 w-4 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                             <Check className="h-2.5 w-2.5 text-emerald-600" />
                           </div>
