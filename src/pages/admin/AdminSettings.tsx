@@ -550,13 +550,13 @@ const TabAnuncios: React.FC = () => {
 };
 
 // ─── Aba Mídia ─────────────────────────────────────────────────
-type MidiaTab = 'anuncios' | 'planos' | 'dispositivos';
+type MidiaTab = 'anuncios' | 'dispositivos';
 const TabMidia: React.FC = () => {
   const [sub, setSub] = useState<MidiaTab>('anuncios');
   return (
     <div className="space-y-5">
       <div className="flex gap-2 flex-wrap">
-        {([{ id: 'anuncios', label: '📢 Anúncios' }, { id: 'planos', label: '📦 Planos' }, { id: 'dispositivos', label: '📡 Dispositivos' }] as const).map(t => (
+        {([{ id: 'anuncios', label: '📢 Anúncios' }, { id: 'dispositivos', label: '📡 Dispositivos' }] as const).map(t => (
           <button key={t.id} onClick={() => setSub(t.id)}
             className={cn('px-4 py-2 rounded-xl text-sm font-medium transition-all', sub === t.id ? 'bg-primary text-white shadow-md' : 'bg-white border border-slate-100 text-slate-600 hover:bg-slate-50')}>
             {t.label}
@@ -564,7 +564,6 @@ const TabMidia: React.FC = () => {
         ))}
       </div>
       {sub === 'anuncios'     && <TabAnuncios />}
-      {sub === 'planos'       && <TabPlanos />}
       {sub === 'dispositivos' && <TabDispositivos />}
     </div>
   );
