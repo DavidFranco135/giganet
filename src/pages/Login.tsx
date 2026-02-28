@@ -105,17 +105,21 @@ export const LoginPage: React.FC = () => {
         } : {}),
       }}
     >
-      {/* Overlay escuro sobre o fundo para melhorar leitura do card */}
-      {loginBgUrl && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 0,
-            backgroundColor: 'rgba(0,0,0,0.35)',
-          }}
-        />
-      )}
-
-      <Card className="w-full max-w-md" style={{ position: 'relative', zIndex: 1 }}>
+      <Card
+        className="w-full max-w-md"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          // Glassmorphism: branco translúcido quando há fundo, branco sólido sem fundo
+          backgroundColor: loginBgUrl ? 'rgba(255,255,255,0.55)' : 'white',
+          backdropFilter: loginBgUrl ? 'blur(18px) saturate(1.6)' : 'none',
+          WebkitBackdropFilter: loginBgUrl ? 'blur(18px) saturate(1.6)' : 'none',
+          boxShadow: loginBgUrl
+            ? '0 8px 40px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(255,255,255,0.55)'
+            : '0 4px 24px rgba(0,0,0,0.08)',
+          border: loginBgUrl ? '1px solid rgba(255,255,255,0.6)' : undefined,
+        }}
+      >
 
         {/* ═══ Logo ═══ */}
         <div className="flex flex-col items-center mb-6">
