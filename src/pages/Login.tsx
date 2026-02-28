@@ -25,11 +25,18 @@ export const LoginPage: React.FC = () => {
   const [uploadingAv, setUploadingAv]     = useState(false);
   const [avStatus,    setAvStatus   ]     = useState<'idle'|'ok'|'error'>('idle');
 
-  // logo do admin
-  const [logoUrl, setLogoUrl] = useState('');
+  // logo do admin + plano de fundo do login
+  const [logoUrl,   setLogoUrl  ] = useState('');
+  const [loginBgUrl, setLoginBgUrl] = useState('');
   useEffect(() => {
     getDoc(doc(db, 'adminSettings', 'profile'))
-      .then(snap => { if (snap.exists() && snap.data()?.avatarUrl) setLogoUrl(snap.data().avatarUrl); })
+      .then(snap => {
+        if (snap.exists()) {
+          const d = snap.data();
+          if (d?.avatarUrl)  setLogoUrl(d.avatarUrl);
+          if (d?.loginBgUrl) setLoginBgUrl(d.loginBgUrl);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -86,8 +93,30 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        backgroundColor: '#f1f5f9',
+        ...(loginBgUrl ? {
+          backgroundImage: `url(${loginBgUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        } : {}),
+      }}
+    >
+      {/* Overlay escuro sobre o fundo para melhorar leitura do card */}
+      {loginBgUrl && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 0,
+            backgroundColor: 'rgba(0,0,0,0.40)',
+            backdropFilter: 'blur(2px)',
+          }}
+        />
+      )}
+
+      <Card className="w-full max-w-md" style={{ position: 'relative', zIndex: 1 }}>
 
         {/* ═══ Logo ═══ */}
         <div className="flex flex-col items-center mb-6">
