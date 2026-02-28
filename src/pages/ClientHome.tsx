@@ -4,14 +4,14 @@ import { Card, Button, cn } from '../components/UI';
 import {
   Wifi, WifiOff, AlertTriangle, Download, Copy,
   Headphones, FileText, X, CheckCircle, ChevronLeft, ChevronRight,
-  ExternalLink, Router,
+  ExternalLink, Router, Zap, Check,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getAvatarUrl } from '../lib/imgbbService';
-import type { Announcement, DeviceImage } from '../types';
+import type { Announcement, DeviceImage, Plan } from '../types';
 
 // ── Modal Genérico ─────────────────────────────────────────────
 const Modal: React.FC<{
@@ -360,6 +360,112 @@ const CoverBanner: React.FC = () => {
   );
 };
 
+// ── Seção de Planos ────────────────────────────────────────────
+const PlanSection: React.FC = () => {
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getDocs(collection(db, 'plans'))
+      .then(snap => {
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Plan));
+        setPlans(all.sort((a, b) => (a.valor ?? 0) - (b.valor ?? 0)));
+      })
+      .catch(e => console.warn('Planos:', e))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div style={{ height: '120px', borderRadius: '16px', backgroundColor: '#e2e8f0', animation: 'pulse 2s infinite' }} />
+  );
+  if (!plans.length) return null;
+
+  const getImage = (plan: Plan) => (plan as any).imagemUrl || (plan as any).imageUrl;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Cabeçalho */}
+      <div className="flex items-center gap-2">
+        <div className="h-6 w-6 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Zap className="h-3.5 w-3.5 text-primary" />
+        </div>
+        <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">Planos Disponíveis</span>
+      </div>
+
+      {/* Cards horizontais com scroll */}
+      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '6px', scrollSnapType: 'x mandatory' }}>
+        {plans.map(plan => (
+          <div
+            key={plan.id}
+            style={{
+              minWidth: '220px', maxWidth: '220px',
+              borderRadius: '16px', overflow: 'hidden',
+              border: plan.popular ? '2px solid #004aad' : '1px solid #e2e8f0',
+              backgroundColor: 'white',
+              boxShadow: plan.popular ? '0 4px 16px rgba(0,74,173,0.18)' : '0 2px 8px rgba(0,0,0,0.06)',
+              flexShrink: 0,
+              scrollSnapAlign: 'start',
+              display: 'flex', flexDirection: 'column',
+            }}
+          >
+            {/* Popular badge */}
+            {plan.popular && (
+              <div style={{ backgroundColor: '#004aad', color: 'white', fontSize: '10px', fontWeight: 800, textAlign: 'center', padding: '4px 0', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                ⭐ Mais Popular
+              </div>
+            )}
+
+            {/* Imagem do plano */}
+            <div style={{ width: '100%', height: '110px', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {getImage(plan) ? (
+                <img
+                  src={getImage(plan)}
+                  alt={plan.nome}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <Wifi style={{ width: '40px', height: '40px', color: 'rgba(0,74,173,0.2)' }} />
+              )}
+            </div>
+
+            {/* Info */}
+            <div style={{ padding: '14px 14px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <p style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a', margin: 0 }}>{plan.nome}</p>
+
+              {/* Velocidade */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Zap style={{ width: '13px', height: '13px', color: '#004aad' }} />
+                <span style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>{plan.velocidade}</span>
+              </div>
+
+              {/* Preço */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px', marginTop: '2px' }}>
+                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>R$</span>
+                <span style={{ fontSize: '22px', fontWeight: 800, color: '#004aad', lineHeight: 1 }}>
+                  {plan.valor.toFixed(2).split('.')[0]}
+                </span>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: '#004aad' }}>,{plan.valor.toFixed(2).split('.')[1]}</span>
+                <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '2px' }}>/mês</span>
+              </div>
+
+              {/* Benefícios (até 3) */}
+              {plan.beneficios?.slice(0, 3).map((b: string, j: number) => (
+                <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                  <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                    <Check style={{ width: '9px', height: '9px', color: '#16a34a' }} />
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>{b}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ══════════════════════════════════════════════════════════════
 //  PÁGINA PRINCIPAL DO CLIENTE
 // ══════════════════════════════════════════════════════════════
@@ -465,6 +571,9 @@ export const ClientHome: React.FC = () => {
 
       {/* ── SLIDE DE DISPOSITIVOS ── */}
       <DeviceSlider />
+
+      {/* ── PLANOS DISPONÍVEIS ── */}
+      <PlanSection />
 
       {/* Banner indicação */}
       <Card className="bg-primary text-white overflow-hidden relative">
