@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getAvatarUrl } from '../lib/imgbbService';
 import type { Announcement, DeviceImage } from '../types';
@@ -50,20 +50,19 @@ const PixModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onCl
   return (
     <Modal open={open} onClose={onClose} title="Pagar com PIX">
       <div className="space-y-5">
-        <div className="text-center p-6 bg-slate-50 rounded-xl space-y-3">
+        <div className="text-center p-6 bg-slate-50 rounded-xl">
           <p className="text-sm text-slate-500">Valor a pagar</p>
-          <p className="text-4xl font-bold text-slate-900">R$ 99,90</p>
-          <p className="text-xs text-slate-400">Vencimento: 10/03/2024</p>
+          <p className="text-4xl font-bold text-slate-900 mt-1">R$ 99,90</p>
+          <p className="text-xs text-slate-400 mt-1">Vencimento: 10/03/2024</p>
         </div>
         <div className="flex justify-center">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PIX_GIGANET_99.90" alt="QR Code PIX" className="h-48 w-48 rounded-xl border border-slate-200" />
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PIX_GIGANET_99.90" alt="QR Code" className="h-48 w-48 rounded-xl border border-slate-200" />
         </div>
-        <div className="p-3 bg-slate-100 rounded-xl text-[10px] text-slate-600 break-all font-mono leading-relaxed">{pixCode}</div>
+        <div className="p-3 bg-slate-100 rounded-xl text-[10px] text-slate-600 break-all font-mono">{pixCode}</div>
         <Button onClick={() => { navigator.clipboard.writeText(pixCode); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-          className={cn('w-full gap-2 transition-all', copied && 'bg-emerald-500')}>
+          className={cn('w-full gap-2', copied && 'bg-emerald-500')}>
           {copied ? <><CheckCircle className="h-4 w-4" /> Copiado!</> : <><Copy className="h-4 w-4" /> Copiar código PIX</>}
         </Button>
-        <p className="text-center text-xs text-slate-400">Confirmado em até 30 segundos</p>
       </div>
     </Modal>
   );
@@ -73,9 +72,9 @@ const SegundaViaModal: React.FC<{ open: boolean; onClose: () => void }> = ({ ope
   <Modal open={open} onClose={onClose} title="2ª Via de Fatura">
     <div className="space-y-4">
       {[
-        { month: 'Março 2024', value: 'R$ 99,90', status: 'pending', statusLabel: 'Em aberto' },
-        { month: 'Fevereiro 2024', value: 'R$ 99,90', status: 'paid', statusLabel: 'Pago' },
-        { month: 'Janeiro 2024', value: 'R$ 99,90', status: 'paid', statusLabel: 'Pago' },
+        { month: 'Março 2024',     value: 'R$ 99,90', paid: false },
+        { month: 'Fevereiro 2024', value: 'R$ 99,90', paid: true },
+        { month: 'Janeiro 2024',   value: 'R$ 99,90', paid: true },
       ].map((inv, i) => (
         <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
           <div>
@@ -83,10 +82,8 @@ const SegundaViaModal: React.FC<{ open: boolean; onClose: () => void }> = ({ ope
             <p className="text-xs text-slate-500">{inv.value}</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className={cn('text-[10px] font-bold uppercase px-2 py-1 rounded-full', inv.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500')}>{inv.statusLabel}</span>
-            <button className="h-8 w-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100">
-              <Download className="h-4 w-4 text-slate-500" />
-            </button>
+            <span className={cn('text-[10px] font-bold uppercase px-2 py-1 rounded-full', inv.paid ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500')}>{inv.paid ? 'Pago' : 'Em aberto'}</span>
+            <button className="h-8 w-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100"><Download className="h-4 w-4 text-slate-500" /></button>
           </div>
         </div>
       ))}
@@ -102,12 +99,9 @@ const DesbloqueioModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
         <div className="space-y-5">
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-amber-800">Conexão Bloqueada</p>
-              <p className="text-xs text-amber-700 mt-1">Solicite desbloqueio de confiança por até 48h enquanto regulariza o pagamento.</p>
-            </div>
+            <p className="text-sm text-amber-700">Solicite desbloqueio de confiança por até 48h enquanto regulariza o pagamento.</p>
           </div>
-          <Button className="w-full" onClick={() => setSent(true)}>Solicitar Desbloqueio Emergencial</Button>
+          <Button className="w-full" onClick={() => setSent(true)}>Solicitar Desbloqueio</Button>
         </div>
       ) : (
         <div className="text-center space-y-4 py-4">
@@ -124,94 +118,97 @@ const DesbloqueioModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
 };
 
 // ══════════════════════════════════════════════════════════════
-//  CARROSSEL UNIVERSAL
-//  - Botões laterais visíveis no hover
-//  - Indicadores de posição
-//  - Autoplay com pause no hover
+//  CARROSSEL UNIVERSAL — altura FIXA, imagem ocupa 100% da área
+//  SEM classes Tailwind JIT (aspect-[]) — usa style inline
 // ══════════════════════════════════════════════════════════════
-interface SlideItem {
-  id: string;
-  imageUrl: string;
-  title: string;
-  subtitle?: string;
-  link?: string;
-}
+interface Slide { id: string; imageUrl: string; title: string; subtitle?: string; link?: string; }
 
 const Carousel: React.FC<{
-  slides: SlideItem[];
+  slides: Slide[];
   autoplay?: boolean;
-  height?: string;
+  height: number;          // altura em pixels (fixo)
   showOverlay?: boolean;
-}> = ({ slides, autoplay = true, height = 'h-48', showOverlay = true }) => {
-  const [idx, setIdx] = useState(0);
+}> = ({ slides, autoplay = true, height, showOverlay = true }) => {
+  const [idx, setIdx]     = useState(0);
   const [paused, setPaused] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startTimer = () => {
+    if (!autoplay || slides.length < 2) return;
+    if (timer.current) clearInterval(timer.current);
+    timer.current = setInterval(() => setIdx(i => (i + 1) % slides.length), 4500);
+  };
 
   useEffect(() => {
-    if (!autoplay || slides.length < 2 || paused) return;
-    intervalRef.current = setInterval(() => setIdx(i => (i + 1) % slides.length), 4500);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [autoplay, slides.length, paused]);
+    if (paused) { if (timer.current) clearInterval(timer.current); return; }
+    startTimer();
+    return () => { if (timer.current) clearInterval(timer.current); };
+  }, [paused, slides.length]);
 
   const go = (dir: 1 | -1) => {
     setIdx(i => (i + dir + slides.length) % slides.length);
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    startTimer();
   };
 
   if (!slides.length) return null;
   const s = slides[idx];
 
   return (
+    // Container com altura FIXA via style — funciona sem JIT
     <div
-      className={cn('relative rounded-2xl overflow-hidden shadow-sm group select-none', height)}
+      style={{ position: 'relative', width: '100%', height: `${height}px`, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.12)' }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       <AnimatePresence mode="wait">
         <motion.div
           key={s.id}
-          className="absolute inset-0"
-          initial={{ opacity: 0, x: 32 }}
+          style={{ position: 'absolute', inset: 0 }}
+          initial={{ opacity: 0, x: 30 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -32 }}
-          transition={{ duration: 0.32, ease: 'easeInOut' }}
+          exit={{ opacity: 0, x: -30 }}
+          transition={{ duration: 0.3 }}
         >
+          {/* IMAGEM — cobre 100% do container */}
           <img
             src={s.imageUrl}
             alt={s.title}
-            className="w-full h-full object-cover"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',    // ← preenche sem distorcer
+              objectPosition: 'center',
+            }}
             referrerPolicy="no-referrer"
             onError={e => {
-              (e.target as HTMLImageElement).src = 'https://placehold.co/800x300/004aad/white?text=' + encodeURIComponent(s.title);
+              (e.target as HTMLImageElement).src =
+                `https://placehold.co/900x${height}/004aad/ffffff?text=${encodeURIComponent(s.title)}`;
             }}
           />
+
+          {/* Gradiente rodapé para texto */}
           {showOverlay && (
-            <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(to top, rgba(0,0,0,0.70) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)',
+            }} />
           )}
         </motion.div>
       </AnimatePresence>
 
       {/* Texto */}
       {showOverlay && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 z-10 pointer-events-none">
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px', zIndex: 10 }}>
           <AnimatePresence mode="wait">
-            <motion.div
-              key={s.id + '_t'}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: 0.15, duration: 0.25 }}
-            >
-              <p className="text-white font-bold leading-tight drop-shadow-sm">{s.title}</p>
-              {s.subtitle && <p className="text-white/75 text-xs mt-0.5 drop-shadow-sm">{s.subtitle}</p>}
+            <motion.div key={s.id + '_t'} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: 0.12 }}>
+              <p style={{ color: 'white', fontWeight: 700, fontSize: '14px', lineHeight: 1.3, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{s.title}</p>
+              {s.subtitle && <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: '12px', marginTop: '2px' }}>{s.subtitle}</p>}
               {s.link && (
-                <a
-                  href={s.link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="pointer-events-auto mt-1.5 inline-flex items-center gap-1 text-xs text-white/90 hover:text-white underline"
-                >
-                  Saiba mais <ExternalLink className="h-3 w-3" />
+                <a href={s.link} target="_blank" rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: '12px', color: 'rgba(255,255,255,0.9)', textDecoration: 'underline', zIndex: 20, position: 'relative' }}>
+                  Saiba mais <ExternalLink style={{ width: '12px', height: '12px' }} />
                 </a>
               )}
             </motion.div>
@@ -219,33 +216,35 @@ const Carousel: React.FC<{
         </div>
       )}
 
-      {/* Botões prev/next */}
+      {/* Botões prev/next — sempre visíveis */}
       {slides.length > 1 && (
         <>
-          <button
-            onClick={() => go(-1)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/35 hover:bg-black/60 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-200 opacity-0 group-hover:opacity-100 active:scale-90"
-          >
-            <ChevronLeft className="h-5 w-5" />
+          <button onClick={() => go(-1)} style={{
+            position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', zIndex: 20,
+            width: '36px', height: '36px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+            backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
+          }}>
+            <ChevronLeft style={{ width: '20px', height: '20px' }} />
           </button>
-          <button
-            onClick={() => go(1)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/35 hover:bg-black/60 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-200 opacity-0 group-hover:opacity-100 active:scale-90"
-          >
-            <ChevronRight className="h-5 w-5" />
+          <button onClick={() => go(1)} style={{
+            position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', zIndex: 20,
+            width: '36px', height: '36px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+            backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
+          }}>
+            <ChevronRight style={{ width: '20px', height: '20px' }} />
           </button>
 
           {/* Dots */}
-          <div className="absolute bottom-3 right-4 z-20 flex gap-1.5 items-center">
+          <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', zIndex: 20, display: 'flex', gap: '6px', alignItems: 'center' }}>
             {slides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setIdx(i)}
-                className={cn(
-                  'rounded-full transition-all duration-300',
-                  i === idx ? 'bg-white w-5 h-1.5' : 'bg-white/50 w-1.5 h-1.5'
-                )}
-              />
+              <button key={i} onClick={() => setIdx(i)} style={{
+                borderRadius: '99px', border: 'none', cursor: 'pointer', transition: 'all 0.3s',
+                width: i === idx ? '20px' : '6px', height: '6px',
+                backgroundColor: i === idx ? 'white' : 'rgba(255,255,255,0.55)',
+                padding: 0,
+              }} />
             ))}
           </div>
         </>
@@ -254,81 +253,104 @@ const Carousel: React.FC<{
   );
 };
 
-// ── Slide de Anúncios (busca sem índice composto) ──────────────
+// ── Carrossel de Anúncios ──────────────────────────────────────
 const AnnouncementSlider: React.FC = () => {
-  const [slides, setSlides] = useState<SlideItem[]>([]);
+  const [slides, setSlides] = useState<Slide[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getDocs(collection(db, 'announcements'))
       .then(snap => {
         const all = snap.docs.map(d => ({ id: d.id, ...(d.data() as Announcement) }));
-        // filtra ativos e ordena por "ordem" — sem índice composto
-        const active = all
-          .filter(a => a.ativo !== false)
-          .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
-        setSlides(active.map(a => ({
-          id: a.id,
-          imageUrl: a.imagemUrl,
-          title: a.titulo,
-          subtitle: a.descricao,
-          link: a.link,
-        })));
+        const active = all.filter(a => a.ativo !== false).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+        setSlides(active.map(a => ({ id: a.id, imageUrl: a.imagemUrl, title: a.titulo, subtitle: a.descricao, link: a.link })));
       })
-      .catch(err => console.warn('[AnnouncementSlider] erro:', err))
+      .catch(e => console.warn('Anúncios:', e))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
-    return <div className="h-48 rounded-2xl bg-slate-100 animate-pulse" />;
+    return (
+      <div style={{ width: '100%', height: '200px', borderRadius: '16px', backgroundColor: '#e2e8f0', animation: 'pulse 2s infinite' }} />
+    );
   }
   if (!slides.length) return null;
 
-  return <Carousel slides={slides} autoplay height="h-48" showOverlay />;
+  return <Carousel slides={slides} autoplay height={200} showOverlay />;
 };
 
-// ── Slide de Dispositivos ──────────────────────────────────────
+// ── Carrossel de Dispositivos ──────────────────────────────────
 const DeviceSlider: React.FC = () => {
-  const [slides, setSlides] = useState<SlideItem[]>([]);
+  const [slides, setSlides] = useState<Slide[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getDocs(collection(db, 'deviceImages'))
       .then(snap => {
         const all = snap.docs.map(d => ({ id: d.id, ...(d.data() as DeviceImage) }));
-        const active = all
-          .filter(d => d.ativo !== false)
-          .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
-        setSlides(active.map(d => ({
-          id: d.id,
-          imageUrl: d.imagemUrl,
-          title: d.nome,
-          subtitle: d.descricao,
-        })));
+        const active = all.filter(d => d.ativo !== false).sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
+        setSlides(active.map(d => ({ id: d.id, imageUrl: d.imagemUrl, title: d.nome, subtitle: d.descricao })));
       })
-      .catch(err => console.warn('[DeviceSlider] erro:', err))
+      .catch(e => console.warn('Dispositivos:', e))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading || !slides.length) return null;
 
   return (
-    <div className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div className="flex items-center gap-2">
         <div className="h-6 w-6 rounded-lg bg-primary/10 flex items-center justify-center">
           <Router className="h-3.5 w-3.5 text-primary" />
         </div>
-        <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
-          Equipamentos Disponíveis
-        </span>
+        <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">Equipamentos Disponíveis</span>
       </div>
-      <Carousel slides={slides} autoplay={false} height="h-44" showOverlay />
+      <Carousel slides={slides} autoplay={false} height={180} showOverlay />
+    </div>
+  );
+};
+
+// ── Banner de capa do admin ────────────────────────────────────
+// Lê coverUrl de adminSettings/profile e exibe no topo
+const CoverBanner: React.FC = () => {
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    getDoc(doc(db, 'adminSettings', 'profile'))
+      .then(snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data?.coverUrl) setCoverUrl(data.coverUrl);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  // Não renderiza nada enquanto carrega (evita "piscar")
+  if (!loaded || !coverUrl) return null;
+
+  return (
+    <div style={{
+      width: '100%',
+      height: '120px',
+      borderRadius: '16px',
+      overflow: 'hidden',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+    }}>
+      <img
+        src={coverUrl}
+        alt="Capa GigaNet"
+        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+        referrerPolicy="no-referrer"
+      />
     </div>
   );
 };
 
 // ══════════════════════════════════════════════════════════════
-//  PÁGINA PRINCIPAL
+//  PÁGINA PRINCIPAL DO CLIENTE
 // ══════════════════════════════════════════════════════════════
 export const ClientHome: React.FC = () => {
   const { profile } = useAuth();
@@ -345,9 +367,12 @@ export const ClientHome: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <PixModal         open={modal === 'pix'}          onClose={() => setModal(null)} />
-      <SegundaViaModal  open={modal === 'segunda_via'}  onClose={() => setModal(null)} />
-      <DesbloqueioModal open={modal === 'desbloqueio'}  onClose={() => setModal(null)} />
+      <PixModal         open={modal === 'pix'}         onClose={() => setModal(null)} />
+      <SegundaViaModal  open={modal === 'segunda_via'} onClose={() => setModal(null)} />
+      <DesbloqueioModal open={modal === 'desbloqueio'} onClose={() => setModal(null)} />
+
+      {/* ── FOTO DE CAPA (definida pelo admin em Configurações → Meu Perfil) ── */}
+      <CoverBanner />
 
       {/* Header */}
       <header className="flex items-center justify-between">
@@ -365,10 +390,10 @@ export const ClientHome: React.FC = () => {
         </button>
       </header>
 
-      {/* SLIDE DE ANÚNCIOS */}
+      {/* ── SLIDE DE ANÚNCIOS ── */}
       <AnnouncementSlider />
 
-      {/* Cards */}
+      {/* Cards status + fatura */}
       <div className="grid gap-6 md:grid-cols-2">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="h-full flex flex-col justify-between">
@@ -417,11 +442,8 @@ export const ClientHome: React.FC = () => {
           { label: 'Desbloqueio', icon: AlertTriangle,  color: 'bg-amber-500',   action: () => setModal('desbloqueio') },
           { label: 'Suporte',     icon: Headphones,     color: 'bg-emerald-500', action: () => navigate('/support') },
         ] as const).map((a, i) => (
-          <button
-            key={i}
-            onClick={a.action}
-            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:bg-slate-50 hover:shadow-md transition-all active:scale-95"
-          >
+          <button key={i} onClick={a.action}
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:bg-slate-50 hover:shadow-md transition-all active:scale-95">
             <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center text-white', a.color)}>
               <a.icon className="h-5 w-5" />
             </div>
@@ -430,10 +452,10 @@ export const ClientHome: React.FC = () => {
         ))}
       </div>
 
-      {/* SLIDE DE DISPOSITIVOS */}
+      {/* ── SLIDE DE DISPOSITIVOS ── */}
       <DeviceSlider />
 
-      {/* Banner */}
+      {/* Banner indicação */}
       <Card className="bg-primary text-white overflow-hidden relative">
         <div className="relative z-10">
           <h3 className="text-xl font-bold mb-2">Indique e Ganhe!</h3>
