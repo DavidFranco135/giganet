@@ -1,24 +1,47 @@
-import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
-import {defineConfig, loadEnv} from 'vite';
+import tailwindcss from '@tailwindcss/vite';
+import { copyFileSync, existsSync, readdirSync } from 'fs';
+import { resolve } from 'path';
 
-export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
-  return {
-    plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '.'),
-      },
-    },
-    server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
-    },
-  };
+// ── Plugin inline: renomeia ícones antes do build ─────────────
+// Resolve nomes com espaços/parênteses gerados pelo GitHub:
+// "icon-192 (1).png" → "icon-192.png"
+const renameIconsPlugin = () => ({
+  name: 'rename-icons',
+  buildStart() {
+    const publicDir = resolve(process.cwd(), 'public');
+    if (!existsSync(publicDir)) return;
+
+    const iconMap: [string, string][] = [
+      ['icon-192 (1).png',         'icon-192.png'],
+      ['icon-512 (1).png',         'icon-512.png'],
+      ['icon-512 (2).png',         'icon-512.png'],
+      ['apple-touch-icon (1).png', 'apple-touch-icon.png'],
+    ];
+
+    for (const [src, dst] of iconMap) {
+      const srcPath = resolve(publicDir, src);
+      const dstPath = resolve(publicDir, dst);
+      if (existsSync(srcPath) && !existsSync(dstPath)) {
+        copyFileSync(srcPath, dstPath);
+        console.log(`✓ Ícone copiado: ${src} → ${dst}`);
+      }
+    }
+  },
+});
+
+export default defineConfig({
+  plugins: [
+    tailwindcss(),
+    react(),
+    renameIconsPlugin(),
+  ],
+  server: {
+    port: 5173,
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+  },
 });
