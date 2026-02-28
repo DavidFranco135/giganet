@@ -4,98 +4,10 @@ import { auth, db } from '../lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Button, Input, Card } from '../components/UI';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Loader2, CheckCircle, User } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import { uploadFileToImgBB, fileToBase64 } from '../lib/imgbbService';
+import { AvatarCircle } from '../components/AvatarCircle';
 
-// ─────────────────────────────────────────────────────────────────
-// Círculo de avatar — foto ocupa 100% do círculo, sem folga de cor
-// ─────────────────────────────────────────────────────────────────
-interface AvatarCircleProps {
-  src:      string;
-  size:     number;
-  loading:  boolean;
-  onClick:  () => void;
-}
-
-const AvatarCircle: React.FC<AvatarCircleProps> = ({ src, size, loading, onClick }) => {
-  const cam = Math.round(size * 0.28);          // tamanho do badge câmera
-
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        position: 'relative',
-        width:    `${size}px`,
-        height:   `${size}px`,
-        cursor:   loading ? 'not-allowed' : 'pointer',
-        flexShrink: 0,
-      }}
-    >
-      {/* ── Círculo externo: só sombra, SEM borda colorida ── */}
-      <div style={{
-        width:        `${size}px`,
-        height:       `${size}px`,
-        borderRadius: '50%',
-        overflow:     'hidden',            // ← foto cortada exatamente no círculo
-        boxShadow:    '0 4px 18px rgba(0,0,0,0.16)',
-        // SEM border, SEM backgroundColor que vaze — a foto preenche tudo
-      }}>
-        {src ? (
-          <img
-            src={src}
-            alt="Avatar"
-            style={{
-              width:          '100%',
-              height:         '100%',
-              objectFit:      'cover',     // ← ajuste automático, sem distorção
-              objectPosition: 'center',
-              display:        'block',
-            }}
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          // Placeholder: fundo neutro + ícone
-          <div style={{
-            width:           '100%',
-            height:          '100%',
-            backgroundColor: '#e2e8f0',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-          }}>
-            <User
-              style={{ width: size * 0.44, height: size * 0.44, color: '#94a3b8' }}
-              strokeWidth={1.5}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* ── Badge câmera ── */}
-      <div style={{
-        position:        'absolute',
-        bottom:          0,
-        right:           0,
-        width:           `${cam}px`,
-        height:          `${cam}px`,
-        borderRadius:    '50%',
-        backgroundColor: '#004aad',
-        outline:         '3px solid white',   // outline não ocupa espaço do elemento
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'center',
-        boxShadow:       '0 2px 6px rgba(0,0,0,0.22)',
-      }}>
-        {loading
-          ? <Loader2 style={{ width: cam * 0.52, height: cam * 0.52, color: 'white', animation: 'spin 1s linear infinite' }} />
-          : <Camera  style={{ width: cam * 0.52, height: cam * 0.52, color: 'white' }} />
-        }
-      </div>
-    </div>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════
 export const LoginPage: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email,    setEmail   ] = useState('');
@@ -106,13 +18,14 @@ export const LoginPage: React.FC = () => {
   const [error,    setError   ] = useState('');
   const navigate = useNavigate();
 
+  // foto de perfil no cadastro
   const avatarInputRef                    = useRef<HTMLInputElement>(null);
   const [avatarSrc,   setAvatarSrc  ]     = useState('');
   const [avatarUrl,   setAvatarUrl  ]     = useState('');
   const [uploadingAv, setUploadingAv]     = useState(false);
   const [avStatus,    setAvStatus   ]     = useState<'idle'|'ok'|'error'>('idle');
 
-  // Logo salvo pelo admin
+  // logo do admin
   const [logoUrl, setLogoUrl] = useState('');
   useEffect(() => {
     getDoc(doc(db, 'adminSettings', 'profile'))
@@ -178,30 +91,16 @@ export const LoginPage: React.FC = () => {
 
         {/* ═══ Logo ═══ */}
         <div className="flex flex-col items-center mb-6">
-          {/* Círculo do logo — 88px, foto ocupa tudo */}
-          <div style={{
-            width:        '88px',
-            height:       '88px',
-            borderRadius: '50%',
-            overflow:     'hidden',
-            boxShadow:    '0 8px 24px rgba(0,74,173,0.22)',
-            marginBottom: '14px',
-            flexShrink:   0,
-          }}>
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt="GigaNet"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div style={{ width: '100%', height: '100%', backgroundColor: '#004aad', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: 'white', fontWeight: 800, fontSize: '40px' }}>G</span>
-              </div>
-            )}
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">GigaNet Telecom</h1>
+          {/* 
+            Logo sem nenhum wrapper colorido — AvatarCircle com clip-path
+            garante que a foto ocupa 100% sem borda branca 
+          */}
+          <AvatarCircle
+            src={logoUrl}
+            size={88}
+            shadow="0 8px 24px rgba(0,74,173,0.28)"
+          />
+          <h1 className="mt-4 text-2xl font-bold text-slate-900">GigaNet Telecom</h1>
           <p className="text-slate-500 text-sm mt-1">
             {isRegistering ? 'Crie sua conta de assinante' : 'Acesse sua central do assinante'}
           </p>
@@ -230,10 +129,10 @@ export const LoginPage: React.FC = () => {
             />
 
             <div style={{ height: '20px', marginTop: '10px', display: 'flex', alignItems: 'center' }}>
-              {uploadingAv && <p style={{ fontSize: '12px', color: '#004aad', fontWeight: 500 }}>Enviando...</p>}
-              {!uploadingAv && avStatus === 'ok'    && <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}><CheckCircle style={{ width: 13, height: 13 }} /> Foto adicionada!</p>}
-              {!uploadingAv && avStatus === 'error' && <p style={{ fontSize: '12px', color: '#dc2626' }}>Erro no upload. Tente novamente.</p>}
-              {!uploadingAv && avStatus === 'idle'  && <p style={{ fontSize: '12px', color: '#94a3b8' }}>{avatarSrc ? 'Toque para trocar' : 'Toque no círculo para adicionar'}</p>}
+              {uploadingAv                        && <p style={{ fontSize: '12px', color: '#004aad', fontWeight: 500 }}>Enviando...</p>}
+              {!uploadingAv && avStatus === 'ok'  && <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}><CheckCircle style={{ width: 13, height: 13 }} /> Foto adicionada!</p>}
+              {!uploadingAv && avStatus === 'error'&& <p style={{ fontSize: '12px', color: '#dc2626' }}>Erro no upload. Tente novamente.</p>}
+              {!uploadingAv && avStatus === 'idle' && <p style={{ fontSize: '12px', color: '#94a3b8' }}>{avatarSrc ? 'Toque para trocar' : 'Toque no círculo para adicionar'}</p>}
             </div>
           </div>
         )}
