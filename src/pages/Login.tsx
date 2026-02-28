@@ -110,8 +110,7 @@ export const LoginPage: React.FC = () => {
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 0,
-            backgroundColor: 'rgba(0,0,0,0.40)',
-            backdropFilter: 'blur(2px)',
+            backgroundColor: 'rgba(0,0,0,0.35)',
           }}
         />
       )}
