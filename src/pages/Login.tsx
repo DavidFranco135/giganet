@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Button, Input, Card, cn } from '../components/UI';
 import { useNavigate } from 'react-router-dom';
 import { Camera, Loader2, CheckCircle, User } from 'lucide-react';
@@ -24,7 +24,19 @@ export const LoginPage: React.FC = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarStatus, setAvatarStatus]       = useState<'idle' | 'ok' | 'error'>('idle');
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [logoUrl, setLogoUrl] = useState<string>('');
+
+  // Busca logo/avatar do admin para exibir no lugar do "G"
+  useEffect(() => {
+    getDoc(doc(db, 'adminSettings', 'profile'))
+      .then(snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data?.avatarUrl) setLogoUrl(data.avatarUrl);
+        }
+      })
+      .catch(() => {});
+  }, []);
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingAvatar(true);
@@ -95,8 +107,11 @@ export const LoginPage: React.FC = () => {
 
         {/* ── Logo ── */}
         <div className="text-center mb-6">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white font-bold text-3xl mb-3 shadow-lg shadow-primary/20">
-            G
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white font-bold text-3xl mb-3 shadow-lg shadow-primary/20 overflow-hidden">
+            {logoUrl
+              ? <img src={logoUrl} alt="GigaNet" style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+              : 'G'
+            }
           </div>
           <h1 className="text-2xl font-bold text-slate-900">GigaNet Telecom</h1>
           <p className="text-slate-500 text-sm mt-1">
