@@ -128,7 +128,9 @@ const Carousel: React.FC<{
   autoplay?: boolean;
   height: number;          // altura em pixels (fixo)
   showOverlay?: boolean;
-}> = ({ slides, autoplay = true, height, showOverlay = true }) => {
+  bgColor?: string;        // cor de fundo quando a imagem não preenche
+  fit?: 'cover' | 'contain'; // como a imagem é redimensionada
+}> = ({ slides, autoplay = true, height, showOverlay = true, bgColor = '#0f172a', fit = 'contain' }) => {
   const [idx, setIdx]     = useState(0);
   const [paused, setPaused] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -156,7 +158,7 @@ const Carousel: React.FC<{
   return (
     // Container com altura FIXA via style — funciona sem JIT
     <div
-      style={{ position: 'relative', width: '100%', height: `${height}px`, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.12)' }}
+      style={{ position: 'relative', width: '100%', height: `${height}px`, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.12)', backgroundColor: bgColor }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -178,7 +180,7 @@ const Carousel: React.FC<{
               inset: 0,
               width: '100%',
               height: '100%',
-              objectFit: 'cover',    // ← preenche sem distorcer
+              objectFit: fit,        // ← respeita a prop (contain = imagem inteira)
               objectPosition: 'center',
             }}
             referrerPolicy="no-referrer"
@@ -276,7 +278,7 @@ const AnnouncementSlider: React.FC = () => {
   }
   if (!slides.length) return null;
 
-  return <Carousel slides={slides} autoplay height={200} showOverlay />;
+  return <Carousel slides={slides} autoplay height={220} showOverlay fit="contain" bgColor="#0f172a" />;
 };
 
 // ── Carrossel de Dispositivos ──────────────────────────────────
@@ -305,7 +307,7 @@ const DeviceSlider: React.FC = () => {
         </div>
         <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">Equipamentos Disponíveis</span>
       </div>
-      <Carousel slides={slides} autoplay={false} height={180} showOverlay />
+      <Carousel slides={slides} autoplay={false} height={200} showOverlay fit="contain" bgColor="#f1f5f9" />
     </div>
   );
 };
@@ -334,15 +336,24 @@ const CoverBanner: React.FC = () => {
   return (
     <div style={{
       width: '100%',
-      height: '120px',
       borderRadius: '16px',
       overflow: 'hidden',
       boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+      backgroundColor: '#0f172a',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
     }}>
       <img
         src={coverUrl}
         alt="Capa GigaNet"
-        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+        style={{
+          width: '100%',
+          maxHeight: '200px',
+          objectFit: 'contain',
+          objectPosition: 'center',
+          display: 'block',
+        }}
         referrerPolicy="no-referrer"
       />
     </div>
