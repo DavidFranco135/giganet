@@ -3,16 +3,17 @@ import { Card, Button, Input, cn } from '../../components/UI';
 import {
   Shield, Bell, Globe, Database, Save, Key, Link,
   CheckCircle, AlertCircle, Image, Upload, Loader2,
-  Trash2, Eye, EyeOff, Plus, Monitor,
+  Trash2, Eye, EyeOff, Plus, Monitor, User, Camera,
 } from 'lucide-react';
 import {
-  collection, addDoc, getDocs, updateDoc, deleteDoc, doc, orderBy, query,
+  collection, addDoc, getDocs, updateDoc, deleteDoc, doc, orderBy, query, getDoc, setDoc,
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { uploadFileToImgBB } from '../../lib/imgbbService';
+import { uploadFileToImgBB, fileToBase64 } from '../../lib/imgbbService';
+import { useAuth } from '../../contexts/AuthContext';
 import type { Announcement, DeviceImage, Plan } from '../../types';
 
-// ─── Upload Zone ──────────────────────────────────────────────
+// ─── Componente: zona de upload de imagem via ImgBB ───────────
 interface UploadZoneProps {
   currentUrl?: string;
   onUploaded: (url: string) => void;
@@ -20,24 +21,33 @@ interface UploadZoneProps {
   uploading: boolean;
   setUploading: (v: boolean) => void;
   uploadName?: string;
+  height?: string;
 }
 
 const UploadZone: React.FC<UploadZoneProps> = ({
-  currentUrl, onUploaded, label, uploading, setUploading, uploadName,
+  currentUrl, onUploaded, label, uploading, setUploading, uploadName, height = 'h-36',
 }) => {
   const ref = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState(currentUrl || '');
   const [error, setError] = useState('');
+
+  useEffect(() => { setPreview(currentUrl || ''); }, [currentUrl]);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError('');
+    // Preview imediato
+    const b64 = await fileToBase64(file);
+    setPreview(b64);
     setUploading(true);
     try {
       const result = await uploadFileToImgBB(file, uploadName || file.name);
+      setPreview(result.url);
       onUploaded(result.url);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro no upload');
+      setPreview(currentUrl || '');
     } finally {
       setUploading(false);
       if (ref.current) ref.current.value = '';
@@ -50,14 +60,15 @@ const UploadZone: React.FC<UploadZoneProps> = ({
       <div
         onClick={() => !uploading && ref.current?.click()}
         className={cn(
-          'relative h-36 w-full rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition-colors',
-          currentUrl ? 'border-primary/30' : 'border-slate-200 hover:border-primary',
+          'relative w-full rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition-colors',
+          height,
+          preview ? 'border-primary/30' : 'border-slate-200 hover:border-primary',
           uploading && 'opacity-60 cursor-not-allowed',
         )}
       >
-        {currentUrl ? (
+        {preview ? (
           <>
-            <img src={currentUrl} alt="" className="h-full w-full object-cover" />
+            <img src={preview} alt="" className="h-full w-full object-cover" />
             <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
               <span className="text-white text-sm font-medium flex items-center gap-2">
                 <Upload className="h-4 w-4" /> Trocar imagem
@@ -68,7 +79,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           <div className="text-center space-y-2 text-slate-400">
             {uploading
               ? <Loader2 className="h-8 w-8 mx-auto animate-spin text-primary" />
-              : <Image className="h-8 w-8 mx-auto" />}
+              : <Image className="h-8 w-8 mx-auto" />
+            }
             <p className="text-xs">{uploading ? 'Enviando para ImgBB...' : 'Clique para selecionar'}</p>
             <p className="text-[10px] text-slate-300">JPEG, PNG, WebP — máx 32MB</p>
           </div>
@@ -80,22 +92,182 @@ const UploadZone: React.FC<UploadZoneProps> = ({
   );
 };
 
-// ─── Sub-aba: Dispositivos ────────────────────────────────────
+// ─── Sub-aba: Perfil do Admin ──────────────────────────────────
+const TabPerfilAdmin: React.FC = () => {
+  const { profile } = useAuth();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef  = useRef<HTMLInputElement>(null);
+
+  const [avatarPreview, setAvatarPreview] = useState(profile?.fotoUrl || '');
+  const [coverPreview,  setCoverPreview]  = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover,  setUploadingCover]  = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved,  setSaved]  = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Carrega capa já salva
+  useEffect(() => {
+    if (!profile?.uid) return;
+    getDoc(doc(db, 'adminSettings', 'profile'))
+      .then(snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.coverUrl)  setCoverPreview(data.coverUrl);
+          if (data.avatarUrl) setAvatarPreview(data.avatarUrl);
+        }
+      })
+      .catch(() => {});
+  }, [profile?.uid]);
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const b64 = await fileToBase64(file);
+    setAvatarPreview(b64);
+    setUploadingAvatar(true);
+    setErrorMsg('');
+    try {
+      const result = await uploadFileToImgBB(file, `admin_avatar_${profile?.uid}`);
+      setAvatarPreview(result.url);
+      // Salva no Firestore imediatamente
+      await updateDoc(doc(db, 'users', profile!.uid), { fotoUrl: result.url });
+      await setDoc(doc(db, 'adminSettings', 'profile'), { avatarUrl: result.url }, { merge: true });
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao enviar avatar');
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
+  const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const b64 = await fileToBase64(file);
+    setCoverPreview(b64);
+    setUploadingCover(true);
+    setErrorMsg('');
+    try {
+      const result = await uploadFileToImgBB(file, `admin_cover_${profile?.uid}`);
+      setCoverPreview(result.url);
+      await setDoc(doc(db, 'adminSettings', 'profile'), { coverUrl: result.url }, { merge: true });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao enviar capa');
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Foto de capa */}
+      <Card className="overflow-hidden p-0">
+        {/* Banner de capa */}
+        <div
+          className="relative h-40 bg-gradient-to-br from-primary/30 to-primary/10 cursor-pointer group overflow-hidden"
+          onClick={() => !uploadingCover && coverInputRef.current?.click()}
+        >
+          {coverPreview && (
+            <img src={coverPreview} alt="Capa" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          )}
+          <div className={cn(
+            'absolute inset-0 flex items-center justify-center transition-opacity',
+            coverPreview ? 'bg-black/40 opacity-0 group-hover:opacity-100' : 'bg-black/5'
+          )}>
+            {uploadingCover
+              ? <Loader2 className="h-8 w-8 text-white animate-spin" />
+              : (
+                <div className="flex flex-col items-center gap-2 text-white/80">
+                  <Camera className="h-7 w-7" />
+                  <span className="text-xs font-medium">{coverPreview ? 'Trocar foto de capa' : 'Adicionar foto de capa'}</span>
+                </div>
+              )
+            }
+          </div>
+          <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
+        </div>
+
+        {/* Avatar sobre a capa */}
+        <div className="px-6 pb-6">
+          <div className="flex items-end gap-4 -mt-10 mb-4">
+            <div className="relative flex-shrink-0">
+              <div className="h-20 w-20 rounded-full border-4 border-white shadow-lg bg-slate-100 overflow-hidden">
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center bg-primary/10">
+                    <User className="h-8 w-8 text-primary/40" />
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-primary text-white flex items-center justify-center border-2 border-white shadow hover:bg-primary-dark transition-colors disabled:opacity-70"
+              >
+                {uploadingAvatar
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Camera className="h-3.5 w-3.5" />
+                }
+              </button>
+              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} />
+            </div>
+            <div className="pb-1">
+              <p className="font-bold text-slate-900">{profile?.nome || 'Administrador'}</p>
+              <p className="text-xs text-slate-500">{profile?.email}</p>
+            </div>
+          </div>
+
+          {errorMsg && <p className="text-xs text-red-500 mb-3">{errorMsg}</p>}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Foto de Perfil</p>
+              <p className="text-sm text-slate-700">Clique no ícone de câmera sobre o avatar para trocar a foto.</p>
+              <p className="text-xs text-slate-400 mt-1">Salvo automaticamente no ImgBB + Firestore.</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Foto de Capa</p>
+              <p className="text-sm text-slate-700">Clique na área de capa acima para alterar o banner.</p>
+              <p className="text-xs text-slate-400 mt-1">Aparece no topo do painel admin.</p>
+            </div>
+          </div>
+
+          {saved && (
+            <div className="mt-4 flex items-center gap-2 text-emerald-600 text-sm font-medium">
+              <CheckCircle className="h-4 w-4" /> Foto salva com sucesso!
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ─── Sub-aba: Dispositivos ─────────────────────────────────────
 const TabDispositivos: React.FC = () => {
   const [devices, setDevices]     = useState<DeviceImage[]>([]);
   const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
   const [newNome, setNewNome]     = useState('');
   const [newDesc, setNewDesc]     = useState('');
-  const [newUrl, setNewUrl]       = useState('');
+  const [newUrl,  setNewUrl]      = useState('');
   const [saving, setSaving]       = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'deviceImages'), orderBy('criadoEm', 'desc')));
-      setDevices(snap.docs.map(d => ({ id: d.id, ...d.data() } as DeviceImage)));
-    } catch { /* coleção vazia */ }
+      const snap = await getDocs(collection(db, 'deviceImages'));
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as DeviceImage));
+      // Ordena no cliente (sem índice composto)
+      all.sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
+      setDevices(all);
+    } catch (e) { console.warn('deviceImages:', e); }
     finally { setLoading(false); }
   };
 
@@ -144,7 +316,7 @@ const TabDispositivos: React.FC = () => {
           <Input label="Descrição (opcional)" placeholder="Ex: Dual Band, 3000Mbps" value={newDesc} onChange={e => setNewDesc(e.target.value)} />
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleAdd} isLoading={saving} disabled={!newNome || !newUrl} className="gap-2">
+          <Button onClick={handleAdd} isLoading={saving} disabled={!newNome || !newUrl || uploading} className="gap-2">
             <Plus className="h-4 w-4" /> Adicionar
           </Button>
         </div>
@@ -160,10 +332,13 @@ const TabDispositivos: React.FC = () => {
           <div className="grid gap-3 md:grid-cols-2">
             {devices.map(d => (
               <div key={d.id} className={cn('flex gap-3 p-3 rounded-xl border', d.ativo ? 'border-slate-100' : 'border-slate-100 opacity-60')}>
-                <img src={d.imagemUrl} alt={d.nome} className="h-16 w-16 rounded-lg object-cover flex-shrink-0 border border-slate-100" />
+                <img src={d.imagemUrl} alt={d.nome} className="h-16 w-16 rounded-lg object-cover flex-shrink-0 border border-slate-100" referrerPolicy="no-referrer" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-slate-800 text-sm truncate">{d.nome}</p>
                   {d.descricao && <p className="text-xs text-slate-400 truncate">{d.descricao}</p>}
+                  <span className={cn('mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold', d.ativo ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500')}>
+                    {d.ativo ? '● Visível' : '● Oculto'}
+                  </span>
                 </div>
                 <div className="flex flex-col gap-1">
                   <button onClick={() => toggleAtivo(d)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
@@ -182,10 +357,10 @@ const TabDispositivos: React.FC = () => {
   );
 };
 
-// ─── Sub-aba: Planos ──────────────────────────────────────────
+// ─── Sub-aba: Planos ───────────────────────────────────────────
 const TabPlanos: React.FC = () => {
-  const [plans, setPlans]         = useState<Plan[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [plans, setPlans]     = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const load = async () => {
@@ -193,7 +368,7 @@ const TabPlanos: React.FC = () => {
     try {
       const snap = await getDocs(collection(db, 'plans'));
       setPlans(snap.docs.map(d => ({ id: d.id, ...d.data() } as Plan)));
-    } catch { }
+    } catch (e) { console.warn('plans:', e); }
     finally { setLoading(false); }
   };
 
@@ -209,11 +384,11 @@ const TabPlanos: React.FC = () => {
       <h3 className="font-bold text-slate-900 flex items-center gap-2">
         <Image className="h-5 w-5 text-primary" /> Imagens dos Planos
       </h3>
-      <p className="text-sm text-slate-500">Clique na imagem de cada plano para enviar ao ImgBB e salvar automaticamente.</p>
+      <p className="text-sm text-slate-500">Clique na imagem para enviar ao ImgBB e salvar automaticamente.</p>
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : plans.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-8">Nenhum plano no Firestore.</p>
+        <p className="text-sm text-slate-400 text-center py-8">Nenhum plano. Cadastre em "Gerenciar Planos".</p>
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
           {plans.map(plan => (
@@ -237,20 +412,22 @@ const TabPlanos: React.FC = () => {
   );
 };
 
-// ─── Sub-aba: Anúncios ────────────────────────────────────────
+// ─── Sub-aba: Anúncios ─────────────────────────────────────────
 const TabAnuncios: React.FC = () => {
   const [anuncios, setAnuncios]   = useState<Announcement[]>([]);
   const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving]       = useState(false);
-  const [form, setForm]           = useState({ titulo: '', descricao: '', link: '', imagemUrl: '' });
+  const [form, setForm] = useState({ titulo: '', descricao: '', link: '', imagemUrl: '' });
 
   const load = async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'announcements'), orderBy('ordem', 'asc')));
-      setAnuncios(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
-    } catch { }
+      const snap = await getDocs(collection(db, 'announcements'));
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
+      all.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+      setAnuncios(all);
+    } catch (e) { console.warn('announcements:', e); }
     finally { setLoading(false); }
   };
 
@@ -261,7 +438,9 @@ const TabAnuncios: React.FC = () => {
     setSaving(true);
     try {
       await addDoc(collection(db, 'announcements'), {
-        ...form, ativo: true, ordem: anuncios.length,
+        ...form,
+        ativo: true,
+        ordem: anuncios.length,
         criadoEm: new Date().toISOString(),
       });
       setForm({ titulo: '', descricao: '', link: '', imagemUrl: '' });
@@ -282,6 +461,7 @@ const TabAnuncios: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Formulário de novo anúncio */}
       <Card className="space-y-4">
         <h3 className="font-bold text-slate-900 flex items-center gap-2">
           <Plus className="h-5 w-5 text-primary" /> Novo Anúncio / Banner
@@ -310,48 +490,80 @@ const TabAnuncios: React.FC = () => {
           <div className="md:col-span-2">
             <Input
               label="Descrição (opcional)"
-              placeholder="Texto de apoio"
+              placeholder="Texto de apoio exibido sobre o banner"
               value={form.descricao}
               onChange={e => setForm(p => ({ ...p, descricao: e.target.value }))}
             />
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleAdd} isLoading={saving} disabled={!form.titulo || !form.imagemUrl} className="gap-2">
+          <Button
+            onClick={handleAdd}
+            isLoading={saving}
+            disabled={!form.titulo || !form.imagemUrl || uploading}
+            className="gap-2"
+          >
             <Plus className="h-4 w-4" /> Publicar Anúncio
           </Button>
         </div>
       </Card>
 
+      {/* Lista de anúncios publicados */}
       <Card className="space-y-4">
-        <h3 className="font-bold text-slate-900">Anúncios Publicados</h3>
+        <h3 className="font-bold text-slate-900">
+          Anúncios Publicados
+          <span className="ml-2 text-xs font-normal text-slate-400">
+            ({anuncios.filter(a => a.ativo).length} visíveis de {anuncios.length})
+          </span>
+        </h3>
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
         ) : anuncios.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-8">Nenhum anúncio publicado. Crie o primeiro acima!</p>
+          <p className="text-sm text-slate-400 text-center py-8">
+            Nenhum anúncio publicado. Crie o primeiro acima!
+          </p>
         ) : (
           <div className="space-y-3">
             {anuncios.map(a => (
-              <div key={a.id} className={cn('flex gap-4 p-3 rounded-xl border transition-all', a.ativo ? 'border-slate-100 bg-white' : 'border-slate-100 bg-slate-50 opacity-60')}>
-                <img src={a.imagemUrl} alt={a.titulo} className="h-20 w-32 rounded-lg object-cover flex-shrink-0 border border-slate-100" />
+              <div
+                key={a.id}
+                className={cn(
+                  'flex gap-4 p-3 rounded-xl border transition-all',
+                  a.ativo ? 'border-slate-100 bg-white' : 'border-slate-100 bg-slate-50 opacity-60'
+                )}
+              >
+                <img
+                  src={a.imagemUrl}
+                  alt={a.titulo}
+                  className="h-20 w-32 rounded-lg object-cover flex-shrink-0 border border-slate-100"
+                  referrerPolicy="no-referrer"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-slate-800">{a.titulo}</p>
                   {a.descricao && <p className="text-xs text-slate-400 mt-0.5">{a.descricao}</p>}
                   {a.link && (
-                    <a href={a.link} target="_blank" rel="noreferrer" className="text-xs text-primary mt-1 inline-flex items-center gap-1 hover:underline">
+                    <a href={a.link} target="_blank" rel="noreferrer"
+                      className="text-xs text-primary mt-1 inline-flex items-center gap-1 hover:underline">
                       <Link className="h-3 w-3" /> {a.link}
                     </a>
                   )}
-                  <span className={cn('mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase', a.ativo ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500')}>
+                  <span className={cn(
+                    'mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
+                    a.ativo ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'
+                  )}>
                     <span className={cn('h-1.5 w-1.5 rounded-full', a.ativo ? 'bg-emerald-500' : 'bg-slate-400')} />
-                    {a.ativo ? 'Visível' : 'Oculto'}
+                    {a.ativo ? 'Visível para clientes' : 'Oculto'}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1 flex-shrink-0">
-                  <button onClick={() => toggleAtivo(a)} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
+                  <button onClick={() => toggleAtivo(a)}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
+                    title={a.ativo ? 'Ocultar' : 'Mostrar'}>
                     {a.ativo ? <Eye className="h-4 w-4 text-emerald-500" /> : <EyeOff className="h-4 w-4 text-slate-400" />}
                   </button>
-                  <button onClick={() => handleDelete(a.id)} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors">
+                  <button onClick={() => handleDelete(a.id)}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors"
+                    title="Remover">
                     <Trash2 className="h-4 w-4 text-red-400" />
                   </button>
                 </div>
@@ -364,7 +576,7 @@ const TabAnuncios: React.FC = () => {
   );
 };
 
-// ─── Aba Mídia (container) ────────────────────────────────────
+// ─── Aba Mídia ─────────────────────────────────────────────────
 type MidiaTab = 'anuncios' | 'planos' | 'dispositivos';
 
 const TabMidia: React.FC = () => {
@@ -399,7 +611,7 @@ const TabMidia: React.FC = () => {
   );
 };
 
-// ─── Aba Geral ────────────────────────────────────────────────
+// ─── Aba Geral ─────────────────────────────────────────────────
 const TabGeral: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2500); };
@@ -450,7 +662,7 @@ const TabGeral: React.FC = () => {
   );
 };
 
-// ─── Aba Segurança ────────────────────────────────────────────
+// ─── Aba Segurança ─────────────────────────────────────────────
 const TabSeguranca: React.FC = () => {
   const [show, setShow] = useState(false);
   return (
@@ -469,38 +681,20 @@ const TabSeguranca: React.FC = () => {
           <Button className="gap-2"><Key className="h-4 w-4" /> Atualizar Senha</Button>
         </div>
       </Card>
-      <Card className="space-y-4">
-        <h3 className="text-lg font-bold text-slate-900">Sessões Ativas</h3>
-        {[
-          { device: 'Chrome — Windows 11', location: 'São Paulo, BR', time: 'Agora',    active: true },
-          { device: 'Safari — iPhone 15',  location: 'São Paulo, BR', time: '2h atrás', active: false },
-        ].map((s, i) => (
-          <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-slate-50">
-            <div className="flex items-center gap-3">
-              <div className={cn('h-2.5 w-2.5 rounded-full', s.active ? 'bg-emerald-500' : 'bg-slate-300')} />
-              <div>
-                <p className="font-medium text-sm text-slate-900">{s.device}</p>
-                <p className="text-xs text-slate-500">{s.location} · {s.time}</p>
-              </div>
-            </div>
-            {!s.active && <Button variant="ghost" size="sm" className="text-red-500 text-xs">Encerrar</Button>}
-          </div>
-        ))}
-      </Card>
     </div>
   );
 };
 
-// ─── Aba Notificações ─────────────────────────────────────────
+// ─── Aba Notificações ──────────────────────────────────────────
 const TabNotificacoes: React.FC = () => {
   const [t, setT] = useState({ novoPagamento: true, atraso: true, novoChamado: true, clienteBloqueado: false, relatorioSemanal: true });
   const toggle = (k: keyof typeof t) => setT(p => ({ ...p, [k]: !p[k] }));
   const items = [
-    { key: 'novoPagamento'   as const, label: 'Novo Pagamento Recebido', desc: 'Alerta quando PIX/boleto é confirmado' },
-    { key: 'atraso'          as const, label: 'Fatura em Atraso',        desc: 'Notifica clientes inadimplentes' },
-    { key: 'novoChamado'     as const, label: 'Novo Chamado de Suporte', desc: 'Alerta ao abrir ticket' },
-    { key: 'clienteBloqueado'as const, label: 'Cliente Bloqueado',       desc: 'Bloqueio automático por inadimplência' },
-    { key: 'relatorioSemanal'as const, label: 'Relatório Semanal',       desc: 'Resumo toda segunda-feira' },
+    { key: 'novoPagamento'    as const, label: 'Novo Pagamento Recebido',  desc: 'Alerta quando PIX/boleto é confirmado' },
+    { key: 'atraso'           as const, label: 'Fatura em Atraso',         desc: 'Notifica clientes inadimplentes' },
+    { key: 'novoChamado'      as const, label: 'Novo Chamado de Suporte',  desc: 'Alerta ao abrir ticket' },
+    { key: 'clienteBloqueado' as const, label: 'Cliente Bloqueado',        desc: 'Bloqueio automático por inadimplência' },
+    { key: 'relatorioSemanal' as const, label: 'Relatório Semanal',        desc: 'Resumo toda segunda-feira' },
   ];
   return (
     <Card className="space-y-4">
@@ -512,7 +706,8 @@ const TabNotificacoes: React.FC = () => {
               <p className="font-medium text-sm text-slate-900">{item.label}</p>
               <p className="text-xs text-slate-500">{item.desc}</p>
             </div>
-            <button onClick={() => toggle(item.key)} className={cn('relative inline-flex h-6 w-11 items-center rounded-full transition-colors', t[item.key] ? 'bg-primary' : 'bg-slate-300')}>
+            <button onClick={() => toggle(item.key)}
+              className={cn('relative inline-flex h-6 w-11 items-center rounded-full transition-colors', t[item.key] ? 'bg-primary' : 'bg-slate-300')}>
               <span className={cn('inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform', t[item.key] ? 'translate-x-6' : 'translate-x-1')} />
             </button>
           </div>
@@ -525,15 +720,15 @@ const TabNotificacoes: React.FC = () => {
   );
 };
 
-// ─── Aba Integrações ──────────────────────────────────────────
+// ─── Aba Integrações ───────────────────────────────────────────
 const TabIntegracoes: React.FC = () => {
-  const [ixcUrl, setIxcUrl]         = useState('');
-  const [ixcToken, setIxcToken]     = useState('');
-  const [showToken, setShowToken]   = useState(false);
-  const [testing, setTesting]       = useState(false);
-  const [saved, setSaved]           = useState(false);
-  const [status, setStatus]         = useState<'idle' | 'ok' | 'error'>('idle');
-  const [msg, setMsg]               = useState('');
+  const [ixcUrl, setIxcUrl]       = useState('');
+  const [ixcToken, setIxcToken]   = useState('');
+  const [showToken, setShowToken] = useState(false);
+  const [testing, setTesting]     = useState(false);
+  const [saved, setSaved]         = useState(false);
+  const [status, setStatus]       = useState<'idle' | 'ok' | 'error'>('idle');
+  const [msg, setMsg]             = useState('');
   const webhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/ixc` : '';
 
   const test = async () => {
@@ -544,7 +739,7 @@ const TabIntegracoes: React.FC = () => {
       const data = await res.json();
       res.ok && data.ok ? (setStatus('ok'), setMsg(`Conectado! Versão: ${data.version || 'OK'}`)) : (setStatus('error'), setMsg(data.error || 'Falha.'));
     } catch { setStatus('error'); setMsg('Servidor inacessível.'); }
-    finally  { setTesting(false); }
+    finally { setTesting(false); }
   };
 
   return (
@@ -587,12 +782,7 @@ const TabIntegracoes: React.FC = () => {
       </Card>
 
       <Card className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600">
-            <Link className="h-5 w-5" />
-          </div>
-          <h3 className="font-bold text-slate-900">Webhook — Notificações Automáticas</h3>
-        </div>
+        <h3 className="font-bold text-slate-900">Webhook — Notificações Automáticas</h3>
         <div className="p-4 bg-slate-50 rounded-xl space-y-2">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">URL para cadastrar no IXC</p>
           <div className="flex items-center gap-2">
@@ -614,14 +804,15 @@ const TabIntegracoes: React.FC = () => {
 // ═══════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ═══════════════════════════════════════════════════════════════
-type Tab = 'geral' | 'midia' | 'seguranca' | 'notificacoes' | 'integracoes';
+type Tab = 'perfil' | 'geral' | 'midia' | 'seguranca' | 'notificacoes' | 'integracoes';
 
 export const AdminSettings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<Tab>('geral');
+  const [activeTab, setActiveTab] = useState<Tab>('perfil');
 
   const tabs: { id: Tab; icon: React.ElementType; label: string; badge?: string }[] = [
+    { id: 'perfil',       icon: User,     label: 'Meu Perfil',    badge: 'NOVO' },
     { id: 'geral',        icon: Globe,    label: 'Geral' },
-    { id: 'midia',        icon: Image,    label: 'Mídia',         badge: 'NOVO' },
+    { id: 'midia',        icon: Image,    label: 'Mídia' },
     { id: 'seguranca',    icon: Shield,   label: 'Segurança' },
     { id: 'notificacoes', icon: Bell,     label: 'Notificações' },
     { id: 'integracoes',  icon: Database, label: 'Integrações' },
@@ -662,6 +853,7 @@ export const AdminSettings: React.FC = () => {
         </div>
 
         <div className="md:col-span-2">
+          {activeTab === 'perfil'       && <TabPerfilAdmin />}
           {activeTab === 'geral'        && <TabGeral />}
           {activeTab === 'midia'        && <TabMidia />}
           {activeTab === 'seguranca'    && <TabSeguranca />}
@@ -672,3 +864,7 @@ export const AdminSettings: React.FC = () => {
     </div>
   );
 };
+
+// Icones que faltam no import
+function Save(props: any) { return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>; }
+function Globe(props: any) { return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>; }
