@@ -9,70 +9,61 @@ import { auth, db }    from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { cn }          from '../components/UI';
 
-// ── Hook: logo salvo pelo admin ─────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// Hook: busca logo salvo pelo admin
+// ─────────────────────────────────────────────────────────────────
 function useAdminLogo() {
-  const [logoUrl, setLogoUrl] = useState('');
+  const [url, setUrl] = useState('');
   useEffect(() => {
     getDoc(doc(db, 'adminSettings', 'profile'))
-      .then(snap => {
-        if (snap.exists()) {
-          const d = snap.data();
-          if (d?.avatarUrl) setLogoUrl(d.avatarUrl);
-        }
-      })
+      .then(snap => { if (snap.exists() && snap.data()?.avatarUrl) setUrl(snap.data().avatarUrl); })
       .catch(() => {});
   }, []);
-  return logoUrl;
+  return url;
 }
 
-// ── LogoBlock: retângulo arredondado SEM moldura circular ────────
-// Mostra a imagem inteira (sem corte excessivo) ou a letra "G"
-const LogoBlock: React.FC<{ height?: number }> = ({ height = 52 }) => {
+// ─────────────────────────────────────────────────────────────────
+// LogoCircle — círculo exato: foto ocupa 100%, sem anel colorido
+// ─────────────────────────────────────────────────────────────────
+const LogoCircle: React.FC<{ size?: number }> = ({ size = 44 }) => {
   const logoUrl = useAdminLogo();
 
-  const containerStyle: React.CSSProperties = {
-    width:           '100%',
-    height:          `${height}px`,
-    borderRadius:    '12px',
-    overflow:        'hidden',
-    flexShrink:      0,
-    backgroundColor: '#004aad',
-    display:         'flex',
-    alignItems:      'center',
-    justifyContent:  'center',
-    boxShadow:       '0 2px 10px rgba(0,74,173,0.18)',
-  };
-
-  if (logoUrl) {
-    return (
-      <div style={containerStyle}>
+  return (
+    <div style={{
+      width:        `${size}px`,
+      height:       `${size}px`,
+      borderRadius: '50%',
+      overflow:     'hidden',          // ← foto cortada no círculo, sem sobra
+      flexShrink:   0,
+      boxShadow:    '0 2px 8px rgba(0,0,0,0.14)',
+      // SEM border nem backgroundColor externo — sem anel
+    }}>
+      {logoUrl ? (
         <img
           src={logoUrl}
-          alt="GigaNet"
+          alt="Logo"
           style={{
             width:          '100%',
             height:         '100%',
-            objectFit:      'cover',      // ← preenche tudo, SEM moldura circular
+            objectFit:      'cover',   // ← preenche o círculo inteiro
             objectPosition: 'center',
             display:        'block',
           }}
           referrerPolicy="no-referrer"
         />
-      </div>
-    );
-  }
-
-  return (
-    <div style={containerStyle}>
-      <span style={{
-        color:       'white',
-        fontWeight:  800,
-        fontSize:    `${height * 0.5}px`,
-        letterSpacing: '-1px',
-        userSelect:  'none',
-      }}>
-        G
-      </span>
+      ) : (
+        // Fallback: fundo azul + letra G
+        <div style={{
+          width:           '100%',
+          height:          '100%',
+          backgroundColor: '#004aad',
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+        }}>
+          <span style={{ color: 'white', fontWeight: 800, fontSize: `${size * 0.46}px`, lineHeight: 1 }}>G</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -92,34 +83,22 @@ export const ClientLayout: React.FC<{ children: React.ReactNode }> = ({ children
     { icon: User,       label: 'Perfil',     path: '/profile' },
   ];
 
-  const handleLogout = () => auth.signOut().catch(() => {});
-
   return (
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-0 md:pl-64">
 
       {/* ── Sidebar desktop ── */}
       <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-slate-200 bg-white md:flex">
-
-        {/* Logo — retângulo largo sem moldura circular */}
-        <div className="px-5 pt-6 pb-4">
-          <LogoBlock height={56} />
-          <p className="mt-2 text-center text-xs font-bold text-slate-500 tracking-widest uppercase">
-            GigaNet
-          </p>
+        <div className="px-5 pt-6 pb-4 flex items-center gap-3">
+          <LogoCircle size={44} />
+          <span className="text-lg font-bold text-primary leading-tight">GigaNet</span>
         </div>
 
         <nav className="flex-1 space-y-1 px-4">
           {navItems.map(item => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
-                location.pathname === item.path
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-              )}
-            >
+            <Link key={item.path} to={item.path} className={cn(
+              'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
+              location.pathname === item.path ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+            )}>
               <item.icon className="h-5 w-5" />
               {item.label}
             </Link>
@@ -128,11 +107,10 @@ export const ClientLayout: React.FC<{ children: React.ReactNode }> = ({ children
 
         <div className="p-4 border-t border-slate-100">
           <button
-            onClick={handleLogout}
+            onClick={() => auth.signOut()}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
           >
-            <LogOut className="h-5 w-5" />
-            Sair
+            <LogOut className="h-5 w-5" /> Sair
           </button>
         </div>
       </aside>
@@ -140,20 +118,16 @@ export const ClientLayout: React.FC<{ children: React.ReactNode }> = ({ children
       {/* ── Bottom Nav mobile ── */}
       <nav className="fixed bottom-0 left-0 z-50 flex w-full border-t border-slate-200 bg-white md:hidden">
         {navItems.map(item => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={cn(
-              'flex flex-1 flex-col items-center justify-center py-2 transition-colors',
-              location.pathname === item.path ? 'text-primary' : 'text-slate-400',
-            )}
-          >
+          <Link key={item.path} to={item.path} className={cn(
+            'flex flex-1 flex-col items-center justify-center py-2 transition-colors',
+            location.pathname === item.path ? 'text-primary' : 'text-slate-400',
+          )}>
             <item.icon className="h-5 w-5" />
             <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wider">{item.label}</span>
           </Link>
         ))}
         <button
-          onClick={handleLogout}
+          onClick={() => auth.signOut()}
           className="flex flex-1 flex-col items-center justify-center py-2 text-slate-400 hover:text-red-500 transition-colors"
         >
           <LogOut className="h-5 w-5" />
@@ -161,9 +135,7 @@ export const ClientLayout: React.FC<{ children: React.ReactNode }> = ({ children
         </button>
       </nav>
 
-      <main className="p-4 md:p-8 max-w-5xl mx-auto">
-        {children}
-      </main>
+      <main className="p-4 md:p-8 max-w-5xl mx-auto">{children}</main>
     </div>
   );
 };
@@ -183,32 +155,20 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
     { icon: Settings,        label: 'Configurações', path: '/admin/settings' },
   ];
 
-  const handleLogout = () => auth.signOut().catch(() => {});
-
   return (
     <div className="min-h-screen bg-slate-50 pl-64">
       <aside className="fixed left-0 top-0 flex h-full w-64 flex-col border-r border-slate-200 bg-white">
-
-        {/* Logo */}
-        <div className="px-5 pt-6 pb-4">
-          <LogoBlock height={56} />
-          <p className="mt-2 text-center text-xs font-bold text-slate-500 tracking-widest uppercase">
-            Admin Panel
-          </p>
+        <div className="px-5 pt-6 pb-4 flex items-center gap-3">
+          <LogoCircle size={44} />
+          <span className="text-lg font-bold text-primary leading-tight">Admin</span>
         </div>
 
         <nav className="flex-1 space-y-1 px-4">
           {navItems.map(item => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
-                location.pathname === item.path
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-              )}
-            >
+            <Link key={item.path} to={item.path} className={cn(
+              'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
+              location.pathname === item.path ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+            )}>
               <item.icon className="h-5 w-5" />
               {item.label}
             </Link>
@@ -217,18 +177,15 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
 
         <div className="p-4 border-t border-slate-100">
           <button
-            onClick={handleLogout}
+            onClick={() => auth.signOut()}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
           >
-            <LogOut className="h-5 w-5" />
-            Sair
+            <LogOut className="h-5 w-5" /> Sair
           </button>
         </div>
       </aside>
 
-      <main className="p-8">
-        {children}
-      </main>
+      <main className="p-8">{children}</main>
     </div>
   );
 };
