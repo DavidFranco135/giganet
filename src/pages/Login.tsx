@@ -105,21 +105,7 @@ export const LoginPage: React.FC = () => {
         } : {}),
       }}
     >
-      <Card
-        className="w-full max-w-md"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          // Glassmorphism: branco translúcido quando há fundo, branco sólido sem fundo
-          backgroundColor: loginBgUrl ? 'rgba(255,255,255,0.25)' : 'white',
-          backdropFilter: loginBgUrl ? 'blur(12px) saturate(1.4)' : 'none',
-          WebkitBackdropFilter: loginBgUrl ? 'blur(12px) saturate(1.4)' : 'none',
-          boxShadow: loginBgUrl
-            ? '0 8px 40px rgba(0,0,0,0.15), inset 0 0 0 1px rgba(255,255,255,0.35)'
-            : '0 4px 24px rgba(0,0,0,0.08)',
-          border: loginBgUrl ? '1px solid rgba(255,255,255,0.35)' : undefined,
-        }}
-      >
+      <div style={{ width: "100%", maxWidth: "448px", position: "relative", zIndex: 1, borderRadius: "24px", padding: "32px", backgroundColor: loginBgUrl ? "rgba(255,255,255,0.18)" : "white", backdropFilter: loginBgUrl ? "blur(16px) saturate(1.5)" : "none", WebkitBackdropFilter: loginBgUrl ? "blur(16px) saturate(1.5)" : "none", boxShadow: loginBgUrl ? "0 8px 48px rgba(0,0,0,0.20), inset 0 0 0 1px rgba(255,255,255,0.25)" : "0 4px 24px rgba(0,0,0,0.08)", border: loginBgUrl ? "1px solid rgba(255,255,255,0.25)" : "1px solid #f1f5f9" }}>
 
         {/* ═══ Logo ═══ */}
         <div className="flex flex-col items-center mb-6">
@@ -199,7 +185,7 @@ export const LoginPage: React.FC = () => {
             )}
           </div>
         </form>
-      </Card>
+      </div>
     </div>
   );
 };
