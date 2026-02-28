@@ -9,28 +9,30 @@ import { uploadFileToImgBB, fileToBase64 } from '../lib/imgbbService';
 
 export const LoginPage: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [nome, setNome] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [nome, setNome]         = useState('');
+  const [cpf, setCpf]           = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
   const navigate = useNavigate();
 
-  // Foto de perfil no cadastro
+  // Foto de perfil
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [avatarUrl, setAvatarUrl]         = useState<string>('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [avatarSuccess, setAvatarSuccess] = useState(false);
+  const [avatarUploaded, setAvatarUploaded]   = useState(false);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadingAvatar(true);
-    setAvatarSuccess(false);
 
-    // Preview imediato
+    setUploadingAvatar(true);
+    setAvatarUploaded(false);
+    setAvatarUrl('');
+
+    // Preview imediato antes do upload
     const b64 = await fileToBase64(file);
     setAvatarPreview(b64);
 
@@ -38,10 +40,10 @@ export const LoginPage: React.FC = () => {
       const result = await uploadFileToImgBB(file, `avatar_novo_${Date.now()}`);
       setAvatarUrl(result.url);
       setAvatarPreview(result.url);
-      setAvatarSuccess(true);
-      setTimeout(() => setAvatarSuccess(false), 2500);
+      setAvatarUploaded(true);
+      setTimeout(() => setAvatarUploaded(false), 3000);
     } catch {
-      // Falhou o upload — mantém o preview local mas sem URL definitiva
+      // Mantém preview local, mas não salva URL permanente
       setAvatarUrl('');
     } finally {
       setUploadingAvatar(false);
@@ -53,11 +55,11 @@ export const LoginPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
       if (isRegistering) {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const user = cred.user;
         const isAdmin = email === 'giganetadm@gmail.com';
 
         await setDoc(doc(db, 'users', user.uid), {
@@ -69,7 +71,7 @@ export const LoginPage: React.FC = () => {
           statusConexao: 'offline',
           numeroCliente: Math.floor(100000 + Math.random() * 900000).toString(),
           telefone: '',
-          fotoUrl: avatarUrl || null, // foto do ImgBB (ou null se não enviou)
+          fotoUrl: avatarUrl || null,
           endereco: { rua: '', numero: '', bairro: '', cidade: '', cep: '' },
         });
 
@@ -79,18 +81,21 @@ export const LoginPage: React.FC = () => {
         navigate('/');
       }
     } catch (err: any) {
-      if (err.code === 'auth/email-already-in-use') {
-        setError('Este e-mail já está em uso.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('A senha deve ter pelo menos 6 caracteres.');
-      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-        setError('E-mail ou senha incorretos.');
-      } else {
-        setError('Erro na autenticação. Verifique seus dados.');
-      }
+      if (err.code === 'auth/email-already-in-use')   setError('Este e-mail já está em uso.');
+      else if (err.code === 'auth/weak-password')      setError('A senha deve ter pelo menos 6 caracteres.');
+      else if (err.code === 'auth/invalid-credential') setError('E-mail ou senha incorretos.');
+      else                                             setError('Erro na autenticação. Verifique seus dados.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const reset = () => {
+    setIsRegistering(!isRegistering);
+    setError('');
+    setAvatarPreview(null);
+    setAvatarUrl('');
+    setAvatarUploaded(false);
   };
 
   return (
@@ -103,25 +108,24 @@ export const LoginPage: React.FC = () => {
             G
           </div>
           <h1 className="text-2xl font-bold text-slate-900">GigaNet Telecom</h1>
-          <p className="text-slate-500">
+          <p className="text-slate-500 text-sm mt-1">
             {isRegistering ? 'Crie sua conta de assinante' : 'Acesse sua central do assinante'}
           </p>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">
 
-          {/* Campos extras no cadastro */}
           {isRegistering && (
             <>
-              {/* Upload de foto de perfil */}
-              <div className="flex flex-col items-center gap-3 py-2">
+              {/* Foto de perfil */}
+              <div className="flex flex-col items-center gap-2 py-2">
                 <div className="relative">
                   <div className="h-20 w-20 rounded-full overflow-hidden bg-slate-100 border-4 border-white shadow-md">
                     {avatarPreview ? (
-                      <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
+                      <img src={avatarPreview} alt="Foto" className="h-full w-full object-cover" />
                     ) : (
-                      <div className="h-full w-full flex items-center justify-center text-slate-400">
-                        <User className="h-8 w-8" />
+                      <div className="h-full w-full flex items-center justify-center bg-primary/5">
+                        <User className="h-8 w-8 text-primary/30" />
                       </div>
                     )}
                   </div>
@@ -148,19 +152,19 @@ export const LoginPage: React.FC = () => {
                 {uploadingAvatar && (
                   <p className="text-xs text-primary animate-pulse">Enviando foto...</p>
                 )}
-                {avatarSuccess && (
-                  <p className="text-xs text-emerald-600 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" /> Foto carregada!
+                {avatarUploaded && (
+                  <p className="text-xs text-emerald-600 flex items-center gap-1 font-medium">
+                    <CheckCircle className="h-3 w-3" /> Foto carregada com sucesso!
                   </p>
                 )}
                 {!avatarPreview && !uploadingAvatar && (
-                  <p className="text-xs text-slate-400">Adicionar foto de perfil (opcional)</p>
+                  <p className="text-xs text-slate-400">Foto de perfil (opcional)</p>
                 )}
               </div>
 
               <Input
                 label="Nome Completo"
-                placeholder="Seu nome"
+                placeholder="Seu nome completo"
                 value={nome}
                 onChange={e => setNome(e.target.value)}
                 required
@@ -192,7 +196,11 @@ export const LoginPage: React.FC = () => {
             required
           />
 
-          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+          {error && (
+            <p className="text-sm text-red-500 text-center bg-red-50 rounded-xl py-2 px-3">
+              {error}
+            </p>
+          )}
 
           <Button type="submit" className="w-full" isLoading={loading}>
             {isRegistering ? 'Criar Conta' : 'Entrar'}
@@ -201,12 +209,7 @@ export const LoginPage: React.FC = () => {
           <div className="text-center space-y-2">
             <button
               type="button"
-              onClick={() => {
-                setIsRegistering(!isRegistering);
-                setError('');
-                setAvatarPreview(null);
-                setAvatarUrl('');
-              }}
+              onClick={reset}
               className="text-sm text-primary hover:underline block w-full"
             >
               {isRegistering ? 'Já tem uma conta? Entre aqui' : 'Não tem conta? Crie uma agora'}
