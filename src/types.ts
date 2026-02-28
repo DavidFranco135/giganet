@@ -30,7 +30,13 @@ export interface Plan {
   valor: number;
   beneficios: string[];
   popular?: boolean;
+  /**
+   * URL da imagem hospedada no ImgBB.
+   * Usado em AdminPlans, AdminSettings (TabPlanos) e PlansPage.
+   */
   imagemUrl?: string;
+  /** @deprecated use imagemUrl */
+  imageUrl?: string;
 }
 
 export interface Invoice {
