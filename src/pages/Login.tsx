@@ -1,10 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { Button, Input, Card, cn } from '../components/UI';
+import { Button, Input, Card } from '../components/UI';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Loader2, CheckCircle, User } from 'lucide-react';
+import { Camera, Loader2, CheckCircle } from 'lucide-react';
 import { uploadFileToImgBB, fileToBase64 } from '../lib/imgbbService';
 
 export const LoginPage: React.FC = () => {
@@ -17,16 +17,16 @@ export const LoginPage: React.FC = () => {
   const [error, setError]       = useState('');
   const navigate = useNavigate();
 
-  // Foto de perfil
-  const fileInputRef              = useRef<HTMLInputElement>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string>('');
-  const [avatarUrl, setAvatarUrl]         = useState<string>('');
+  // ── Foto de perfil do novo cadastro ──
+  const fileInputRef                          = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview]     = useState<string>('');
+  const [avatarUrl, setAvatarUrl]             = useState<string>('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarStatus, setAvatarStatus]       = useState<'idle' | 'ok' | 'error'>('idle');
 
+  // ── Logo do admin (substitui o "G") ──
   const [logoUrl, setLogoUrl] = useState<string>('');
 
-  // Busca logo/avatar do admin para exibir no lugar do "G"
   useEffect(() => {
     getDoc(doc(db, 'adminSettings', 'profile'))
       .then(snap => {
@@ -37,12 +37,14 @@ export const LoginPage: React.FC = () => {
       })
       .catch(() => {});
   }, []);
+
+  // ── Upload da foto de perfil ──
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingAvatar(true);
     setAvatarStatus('idle');
 
-    // Preview imediato
     const b64 = await fileToBase64(file);
     setAvatarPreview(b64);
 
@@ -60,6 +62,7 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  // ── Login / Cadastro ──
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -84,10 +87,10 @@ export const LoginPage: React.FC = () => {
         navigate('/');
       }
     } catch (err: any) {
-      if      (err.code === 'auth/email-already-in-use')   setError('Este e-mail já está em uso.');
-      else if (err.code === 'auth/weak-password')           setError('Senha deve ter pelo menos 6 caracteres.');
-      else if (err.code === 'auth/invalid-credential')      setError('E-mail ou senha incorretos.');
-      else                                                  setError('Erro na autenticação. Verifique seus dados.');
+      if      (err.code === 'auth/email-already-in-use') setError('Este e-mail já está em uso.');
+      else if (err.code === 'auth/weak-password')         setError('Senha deve ter pelo menos 6 caracteres.');
+      else if (err.code === 'auth/invalid-credential')    setError('E-mail ou senha incorretos.');
+      else                                                setError('Erro na autenticação. Verifique seus dados.');
     } finally {
       setLoading(false);
     }
@@ -105,13 +108,20 @@ export const LoginPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <Card className="w-full max-w-md">
 
-        {/* ── Logo ── */}
+        {/* ── Logo: foto do admin ou letra "G" ── */}
         <div className="text-center mb-6">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white font-bold text-3xl mb-3 shadow-lg shadow-primary/20 overflow-hidden">
-            {logoUrl
-              ? <img src={logoUrl} alt="GigaNet" style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
-              : 'G'
-            }
+          <div
+            className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white font-bold text-3xl mb-3 shadow-lg shadow-primary/20"
+            style={{ overflow: 'hidden' }}
+          >
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="GigaNet"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                referrerPolicy="no-referrer"
+              />
+            ) : 'G'}
           </div>
           <h1 className="text-2xl font-bold text-slate-900">GigaNet Telecom</h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -119,52 +129,28 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
 
-        {/* ══════════════════════════════════════════════════════
-            FOTO DE PERFIL — só aparece no modo CADASTRO
-            Usa altura/largura fixas, sem classes JIT
-        ══════════════════════════════════════════════════════ */}
+        {/* ── Foto de perfil — somente no cadastro ── */}
         {isRegistering && (
-          <div
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px' }}
-          >
-            {/* Label acima */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px' }}>
             <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '12px', fontWeight: 500 }}>
               Foto de perfil <span style={{ color: '#94a3b8' }}>(opcional)</span>
             </p>
 
-            {/* Círculo clicável — 96x96, sempre visível */}
             <div
               onClick={() => !uploadingAvatar && fileInputRef.current?.click()}
               style={{
-                position: 'relative',
-                width: '96px',
-                height: '96px',
-                borderRadius: '50%',
-                cursor: uploadingAvatar ? 'not-allowed' : 'pointer',
-                flexShrink: 0,
+                position: 'relative', width: '96px', height: '96px',
+                borderRadius: '50%', cursor: uploadingAvatar ? 'not-allowed' : 'pointer', flexShrink: 0,
               }}
             >
-              {/* Fundo / imagem */}
               <div style={{
-                width: '96px',
-                height: '96px',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                border: '3px solid #e2e8f0',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.10)',
-                backgroundColor: '#f1f5f9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                width: '96px', height: '96px', borderRadius: '50%', overflow: 'hidden',
+                border: '3px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.10)',
+                backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {avatarPreview ? (
-                  <img
-                    src={avatarPreview}
-                    alt="Foto de perfil"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
+                  <img src={avatarPreview} alt="Foto de perfil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  /* Ícone de pessoa quando não há foto */
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#94a3b8' }}>
                     <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -175,19 +161,11 @@ export const LoginPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Botão câmera no canto inferior direito */}
               <div style={{
-                position: 'absolute',
-                bottom: '2px',
-                right: '2px',
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                backgroundColor: '#004aad',
-                border: '2px solid white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                position: 'absolute', bottom: '2px', right: '2px',
+                width: '28px', height: '28px', borderRadius: '50%',
+                backgroundColor: '#004aad', border: '2px solid white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 boxShadow: '0 2px 6px rgba(0,0,0,0.20)',
               }}>
                 {uploadingAvatar
@@ -196,43 +174,27 @@ export const LoginPage: React.FC = () => {
                 }
               </div>
 
-              {/* Input oculto */}
               <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                style={{ display: 'none' }}
-                onChange={handleAvatarChange}
+                ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }} onChange={handleAvatarChange}
               />
             </div>
 
-            {/* Feedback de status abaixo do círculo */}
             <div style={{ marginTop: '10px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {uploadingAvatar && (
-                <p style={{ fontSize: '12px', color: '#004aad', fontWeight: 500 }}>
-                  Enviando imagem...
-                </p>
-              )}
+              {uploadingAvatar && <p style={{ fontSize: '12px', color: '#004aad', fontWeight: 500 }}>Enviando imagem...</p>}
               {avatarStatus === 'ok' && !uploadingAvatar && (
                 <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <CheckCircle style={{ width: '14px', height: '14px' }} />
-                  Foto adicionada!
+                  <CheckCircle style={{ width: '14px', height: '14px' }} /> Foto adicionada!
                 </p>
               )}
               {avatarStatus === 'error' && !uploadingAvatar && (
-                <p style={{ fontSize: '12px', color: '#dc2626' }}>
-                  Erro no upload. Tente novamente.
-                </p>
+                <p style={{ fontSize: '12px', color: '#dc2626' }}>Erro no upload. Tente novamente.</p>
               )}
               {avatarStatus === 'idle' && !uploadingAvatar && !avatarPreview && (
-                <p style={{ fontSize: '12px', color: '#94a3b8' }}>
-                  Toque no círculo para adicionar
-                </p>
+                <p style={{ fontSize: '12px', color: '#94a3b8' }}>Toque no círculo para adicionar</p>
               )}
               {avatarStatus === 'idle' && !uploadingAvatar && avatarPreview && (
-                <p style={{ fontSize: '12px', color: '#94a3b8' }}>
-                  Toque novamente para trocar
-                </p>
+                <p style={{ fontSize: '12px', color: '#94a3b8' }}>Toque novamente para trocar</p>
               )}
             </div>
           </div>
@@ -242,25 +204,13 @@ export const LoginPage: React.FC = () => {
         <form onSubmit={handleAuth} className="space-y-4">
           {isRegistering && (
             <>
-              <Input
-                label="Nome Completo"
-                placeholder="Seu nome completo"
-                value={nome}
-                onChange={e => setNome(e.target.value)}
-                required
-              />
-              <Input
-                label="CPF"
-                placeholder="000.000.000-00"
-                value={cpf}
-                onChange={e => setCpf(e.target.value)}
-                required
-              />
+              <Input label="Nome Completo" placeholder="Seu nome completo" value={nome} onChange={e => setNome(e.target.value)} required />
+              <Input label="CPF" placeholder="000.000.000-00" value={cpf} onChange={e => setCpf(e.target.value)} required />
             </>
           )}
 
-          <Input label="E-mail" type="email" placeholder="seu@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
-          <Input label="Senha"  type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+          <Input label="E-mail" type="email"    placeholder="seu@email.com" value={email}    onChange={e => setEmail(e.target.value)}    required />
+          <Input label="Senha"  type="password" placeholder="••••••••"      value={password} onChange={e => setPassword(e.target.value)} required />
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
