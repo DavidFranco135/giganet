@@ -4,23 +4,31 @@ import { Card, Button, cn } from '../components/UI';
 import {
   Wifi, WifiOff, AlertTriangle, Download, Copy,
   Headphones, FileText, X, CheckCircle, ChevronLeft, ChevronRight,
-  ExternalLink,
+  ExternalLink, Router,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getAvatarUrl } from '../lib/imgbbService';
-import type { Announcement } from '../types';
+import type { Announcement, DeviceImage } from '../types';
 
+// ── Modal Genérico ─────────────────────────────────────────────
 const Modal: React.FC<{ open: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ open, onClose, title, children }) => (
   <AnimatePresence>
     {open && (
-      <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-        <motion.div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
-          initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }}
-          onClick={e => e.stopPropagation()}>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <motion.div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          onClick={e => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-bold text-slate-900">{title}</h2>
             <button onClick={onClose} className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
@@ -34,6 +42,7 @@ const Modal: React.FC<{ open: boolean; onClose: () => void; title: string; child
   </AnimatePresence>
 );
 
+// ── Modal PIX ──────────────────────────────────────────────────
 const PixModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const [copied, setCopied] = useState(false);
   const pixCode = '00020126360014BR.GOV.BCB.PIX0114+5511999999999520400005303986540599.905802BR5920GigaNet Telecom6009SAO PAULO62070503***6304ABCD';
@@ -59,6 +68,7 @@ const PixModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onCl
   );
 };
 
+// ── Modal 2ª Via ───────────────────────────────────────────────
 const SegundaViaModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => (
   <Modal open={open} onClose={onClose} title="2ª Via de Fatura">
     <div className="space-y-4">
@@ -84,6 +94,7 @@ const SegundaViaModal: React.FC<{ open: boolean; onClose: () => void }> = ({ ope
   </Modal>
 );
 
+// ── Modal Desbloqueio ─────────────────────────────────────────
 const DesbloqueioModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const [sent, setSent] = useState(false);
   return (
@@ -119,50 +130,61 @@ const DesbloqueioModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
   );
 };
 
-// ── Galeria de Anúncios com carrossel ───────────────────────────
-const AnnouncementGallery: React.FC = () => {
-  const [items, setItems]     = useState<Announcement[]>([]);
+// ── Carrossel Reutilizável ─────────────────────────────────────
+interface CarouselItem {
+  id: string;
+  imageUrl: string;
+  title: string;
+  subtitle?: string;
+  link?: string;
+}
+
+interface CarouselProps {
+  items: CarouselItem[];
+  autoplay?: boolean;
+  height?: string;
+}
+
+const Carousel: React.FC<CarouselProps> = ({ items, autoplay = true, height = 'h-44' }) => {
   const [current, setCurrent] = useState(0);
-  const [loading, setLoading] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDocs(
-          query(collection(db, 'announcements'), where('ativo', '==', true), orderBy('ordem', 'asc'))
-        );
-        setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
-      } catch { /* coleção vazia ou índice ainda não criado — ignora */ }
-      finally { setLoading(false); }
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (items.length < 2) return;
+    if (!autoplay || items.length < 2) return;
     timerRef.current = setTimeout(() => setCurrent(c => (c + 1) % items.length), 5000);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [current, items.length]);
+  }, [current, items.length, autoplay]);
 
   const go = (dir: 1 | -1) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setCurrent(c => (c + dir + items.length) % items.length);
   };
 
-  if (loading) return <div className="h-44 rounded-2xl bg-slate-100 animate-pulse" />;
   if (items.length === 0) return null;
 
   const item = items[current];
   return (
-    <div className="relative overflow-hidden rounded-2xl shadow-sm">
+    <div className={`relative overflow-hidden rounded-2xl shadow-sm ${height}`}>
       <AnimatePresence mode="wait">
-        <motion.div key={item.id} initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -60 }} transition={{ duration: 0.3 }}>
-          <img src={item.imagemUrl} alt={item.titulo} className="w-full h-44 object-cover" />
+        <motion.div
+          key={item.id}
+          initial={{ opacity: 0, x: 60 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -60 }}
+          transition={{ duration: 0.3 }}
+          className="absolute inset-0"
+        >
+          <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex flex-col justify-end p-4">
-            <p className="text-white font-bold leading-tight">{item.titulo}</p>
-            {item.descricao && <p className="text-white/80 text-xs mt-0.5">{item.descricao}</p>}
+            <p className="text-white font-bold leading-tight">{item.title}</p>
+            {item.subtitle && <p className="text-white/80 text-xs mt-0.5">{item.subtitle}</p>}
             {item.link && (
-              <a href={item.link} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-xs text-white/90 hover:text-white font-medium underline w-fit">
+              <a
+                href={item.link}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1.5 inline-flex items-center gap-1 text-xs text-white/90 hover:text-white font-medium underline w-fit"
+              >
                 Saiba mais <ExternalLink className="h-3 w-3" />
               </a>
             )}
@@ -172,16 +194,25 @@ const AnnouncementGallery: React.FC = () => {
 
       {items.length > 1 && (
         <>
-          <button onClick={() => go(-1)} className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/30 hover:bg-black/50 flex items-center justify-center text-white backdrop-blur-sm transition-colors">
+          <button
+            onClick={() => go(-1)}
+            className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/30 hover:bg-black/50 flex items-center justify-center text-white backdrop-blur-sm transition-colors z-10"
+          >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <button onClick={() => go(1)} className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/30 hover:bg-black/50 flex items-center justify-center text-white backdrop-blur-sm transition-colors">
+          <button
+            onClick={() => go(1)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/30 hover:bg-black/50 flex items-center justify-center text-white backdrop-blur-sm transition-colors z-10"
+          >
             <ChevronRight className="h-4 w-4" />
           </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
             {items.map((_, i) => (
-              <button key={i} onClick={() => { if (timerRef.current) clearTimeout(timerRef.current); setCurrent(i); }}
-                className={cn('h-1.5 rounded-full transition-all', i === current ? 'bg-white w-5' : 'bg-white/50 w-1.5')} />
+              <button
+                key={i}
+                onClick={() => { if (timerRef.current) clearTimeout(timerRef.current); setCurrent(i); }}
+                className={cn('h-1.5 rounded-full transition-all', i === current ? 'bg-white w-5' : 'bg-white/50 w-1.5')}
+              />
             ))}
           </div>
         </>
@@ -190,10 +221,80 @@ const AnnouncementGallery: React.FC = () => {
   );
 };
 
-// ── Tela Principal ──────────────────────────────────────────────
+// ── Galeria de Anúncios ────────────────────────────────────────
+const AnnouncementGallery: React.FC = () => {
+  const [items, setItems] = useState<CarouselItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'announcements'), where('ativo', '==', true), orderBy('ordem', 'asc'))
+        );
+        setItems(snap.docs.map(d => {
+          const data = d.data() as Announcement;
+          return {
+            id: d.id,
+            imageUrl: data.imagemUrl,
+            title: data.titulo,
+            subtitle: data.descricao,
+            link: data.link,
+          };
+        }));
+      } catch { /* coleção vazia */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  if (loading) return <div className="h-44 rounded-2xl bg-slate-100 animate-pulse" />;
+  if (items.length === 0) return null;
+  return <Carousel items={items} autoplay height="h-44" />;
+};
+
+// ── Galeria de Dispositivos ────────────────────────────────────
+const DeviceGallery: React.FC = () => {
+  const [items, setItems] = useState<CarouselItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'deviceImages'), where('ativo', '==', true), orderBy('criadoEm', 'desc'))
+        );
+        setItems(snap.docs.map(d => {
+          const data = d.data() as DeviceImage;
+          return {
+            id: d.id,
+            imageUrl: data.imagemUrl,
+            title: data.nome,
+            subtitle: data.descricao,
+          };
+        }));
+      } catch { /* coleção vazia */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  if (loading) return null;
+  if (items.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Router className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Equipamentos Disponíveis</h2>
+      </div>
+      <Carousel items={items} autoplay={false} height="h-40" />
+    </div>
+  );
+};
+
+// ── Tela Principal ─────────────────────────────────────────────
 export const ClientHome: React.FC = () => {
   const { profile } = useAuth();
-  const navigate    = useNavigate();
+  const navigate = useNavigate();
   const [modal, setModal] = useState<'pix' | 'segunda_via' | 'desbloqueio' | null>(null);
 
   const statusConfig = {
@@ -210,19 +311,24 @@ export const ClientHome: React.FC = () => {
       <SegundaViaModal  open={modal === 'segunda_via'} onClose={() => setModal(null)} />
       <DesbloqueioModal open={modal === 'desbloqueio'} onClose={() => setModal(null)} />
 
+      {/* Header */}
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Olá, {profile?.nome?.split(' ')[0] ?? 'Cliente'}</h1>
           <p className="text-slate-500">Nº do cliente: {profile?.numeroCliente}</p>
         </div>
-        <button onClick={() => navigate('/profile')} className="h-12 w-12 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-md hover:ring-2 hover:ring-primary transition-all">
+        <button
+          onClick={() => navigate('/profile')}
+          className="h-12 w-12 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-md hover:ring-2 hover:ring-primary transition-all"
+        >
           <img src={avatarUrl} alt="Avatar" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
         </button>
       </header>
 
-      {/* Galeria de anúncios — some automaticamente se não houver banners */}
+      {/* Carrossel de Anúncios */}
       <AnnouncementGallery />
 
+      {/* Cards de Status e Fatura */}
       <div className="grid gap-6 md:grid-cols-2">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="h-full flex flex-col justify-between">
@@ -263,14 +369,19 @@ export const ClientHome: React.FC = () => {
         </motion.div>
       </div>
 
+      {/* Ações Rápidas */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {([
-          { label: 'Gerar PIX',   icon: Copy,         color: 'bg-blue-500',    action: () => setModal('pix') },
-          { label: '2ª Via',      icon: FileText,      color: 'bg-indigo-500',  action: () => setModal('segunda_via') },
-          { label: 'Desbloqueio', icon: AlertTriangle, color: 'bg-amber-500',   action: () => setModal('desbloqueio') },
-          { label: 'Suporte',     icon: Headphones,    color: 'bg-emerald-500', action: () => navigate('/support') },
+          { label: 'Gerar PIX',   icon: Copy,          color: 'bg-blue-500',    action: () => setModal('pix') },
+          { label: '2ª Via',      icon: FileText,       color: 'bg-indigo-500',  action: () => setModal('segunda_via') },
+          { label: 'Desbloqueio', icon: AlertTriangle,  color: 'bg-amber-500',   action: () => setModal('desbloqueio') },
+          { label: 'Suporte',     icon: Headphones,     color: 'bg-emerald-500', action: () => navigate('/support') },
         ] as const).map((a, i) => (
-          <button key={i} onClick={a.action} className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:bg-slate-50 hover:shadow-md transition-all active:scale-95">
+          <button
+            key={i}
+            onClick={a.action}
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:bg-slate-50 hover:shadow-md transition-all active:scale-95"
+          >
             <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center text-white', a.color)}>
               <a.icon className="h-5 w-5" />
             </div>
@@ -279,6 +390,10 @@ export const ClientHome: React.FC = () => {
         ))}
       </div>
 
+      {/* Carrossel de Dispositivos */}
+      <DeviceGallery />
+
+      {/* Banner Indicação */}
       <Card className="bg-primary text-white overflow-hidden relative">
         <div className="relative z-10">
           <h3 className="text-xl font-bold mb-2">Indique e Ganhe!</h3>
