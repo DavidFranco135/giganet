@@ -99,15 +99,19 @@ const UploadZone: React.FC<UploadZoneProps> = ({
 // ─── Aba: Meu Perfil ───────────────────────────────────────────
 const TabPerfilAdmin: React.FC = () => {
   const { profile } = useAuth();
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-  const coverInputRef  = useRef<HTMLInputElement>(null);
+  const avatarInputRef  = useRef<HTMLInputElement>(null);
+  const coverInputRef   = useRef<HTMLInputElement>(null);
+  const loginBgInputRef = useRef<HTMLInputElement>(null);
 
-  const [avatarPreview, setAvatarPreview] = useState('');
-  const [coverPreview,  setCoverPreview]  = useState('');
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [uploadingCover,  setUploadingCover]  = useState(false);
-  const [avatarSaved, setAvatarSaved] = useState(false);
-  const [coverSaved,  setCoverSaved]  = useState(false);
+  const [avatarPreview,   setAvatarPreview  ] = useState('');
+  const [coverPreview,    setCoverPreview   ] = useState('');
+  const [loginBgPreview,  setLoginBgPreview ] = useState('');
+  const [uploadingAvatar,  setUploadingAvatar ] = useState(false);
+  const [uploadingCover,   setUploadingCover  ] = useState(false);
+  const [uploadingLoginBg, setUploadingLoginBg] = useState(false);
+  const [avatarSaved,  setAvatarSaved ] = useState(false);
+  const [coverSaved,   setCoverSaved  ] = useState(false);
+  const [loginBgSaved, setLoginBgSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -117,7 +121,8 @@ const TabPerfilAdmin: React.FC = () => {
       .then(snap => {
         if (snap.exists()) {
           const d = snap.data();
-          if (d.coverUrl)  setCoverPreview(d.coverUrl);
+          if (d.coverUrl)   setCoverPreview(d.coverUrl);
+          if (d.loginBgUrl) setLoginBgPreview(d.loginBgUrl);
           if (d.avatarUrl && !profile.fotoUrl) setAvatarPreview(d.avatarUrl);
         }
       })
@@ -164,6 +169,27 @@ const TabPerfilAdmin: React.FC = () => {
     } finally {
       setUploadingCover(false);
       if (coverInputRef.current) coverInputRef.current.value = '';
+    }
+  };
+
+  const handleLoginBgFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+    setErrorMsg(''); setLoginBgSaved(false);
+    const b64 = await fileToBase64(file);
+    setLoginBgPreview(b64);
+    setUploadingLoginBg(true);
+    try {
+      const result = await uploadFileToImgBB(file, `login_bg_${profile.uid}`);
+      setLoginBgPreview(result.url);
+      await setDoc(doc(db, 'adminSettings', 'profile'), { loginBgUrl: result.url }, { merge: true });
+      setLoginBgSaved(true);
+      setTimeout(() => setLoginBgSaved(false), 3000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao enviar plano de fundo');
+    } finally {
+      setUploadingLoginBg(false);
+      if (loginBgInputRef.current) loginBgInputRef.current.value = '';
     }
   };
 
@@ -302,6 +328,110 @@ const TabPerfilAdmin: React.FC = () => {
               <p className="text-xs text-violet-600">Clique na área de capa acima. Aparece na tela inicial do cliente.</p>
             </div>
           </div>
+        </div>
+      </Card>
+
+      {/* ══ PLANO DE FUNDO DA TELA DE LOGIN ══ */}
+      <Card className="space-y-4">
+        <div>
+          <p className="font-bold text-slate-900 flex items-center gap-2">
+            <span style={{ fontSize: '16px' }}>🔐</span> Plano de Fundo da Tela de Login
+          </p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Aparece como fundo na página de login do sistema. Recomendado: imagem paisagem 1280×720 ou maior.
+          </p>
+        </div>
+
+        {/* Zona de upload */}
+        <div
+          onClick={() => !uploadingLoginBg && loginBgInputRef.current?.click()}
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '200px',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            cursor: uploadingLoginBg ? 'not-allowed' : 'pointer',
+            border: loginBgPreview ? '2px solid rgba(0,74,173,0.2)' : '2px dashed #cbd5e1',
+            backgroundColor: '#f8fafc',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {loginBgPreview && (
+            <img
+              src={loginBgPreview}
+              alt="Plano de fundo login"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+              referrerPolicy="no-referrer"
+            />
+          )}
+
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          }}>
+            {uploadingLoginBg ? (
+              <>
+                <Loader2 style={{ width: '28px', height: '28px', color: loginBgPreview ? 'white' : '#004aad', animation: 'spin 1s linear infinite' }} />
+                <span style={{ fontSize: '13px', fontWeight: 500, color: loginBgPreview ? 'white' : '#004aad' }}>Enviando imagem...</span>
+              </>
+            ) : !loginBgPreview ? (
+              <>
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '50%',
+                  backgroundColor: 'rgba(0,74,173,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Image style={{ width: '22px', height: '22px', color: 'rgba(0,74,173,0.4)' }} />
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: '#64748b' }}>Clique para escolher a imagem de fundo</span>
+                <span style={{ fontSize: '11px', color: '#94a3b8' }}>JPEG, PNG, WebP — recomendado 1280×720px ou maior</span>
+              </>
+            ) : null}
+          </div>
+
+          {/* Botão trocar (quando já há imagem) */}
+          {loginBgPreview && !uploadingLoginBg && (
+            <div style={{
+              position: 'absolute', bottom: '10px', right: '10px',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+              color: 'white', padding: '5px 12px', borderRadius: '99px',
+              fontSize: '12px', fontWeight: 500,
+            }}>
+              <Camera style={{ width: '13px', height: '13px' }} /> Trocar imagem
+            </div>
+          )}
+
+          {/* Badge salvo */}
+          {loginBgSaved && (
+            <div style={{
+              position: 'absolute', top: '10px', right: '10px',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              backgroundColor: '#16a34a', color: 'white',
+              padding: '5px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: 700,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.20)',
+            }}>
+              <CheckCircle style={{ width: '13px', height: '13px' }} /> Plano de fundo salvo!
+            </div>
+          )}
+
+          <input
+            ref={loginBgInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            style={{ display: 'none' }}
+            onChange={handleLoginBgFile}
+          />
+        </div>
+
+        <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 flex items-start gap-2">
+          <span style={{ fontSize: '14px', flexShrink: 0, marginTop: '1px' }}>💡</span>
+          <p className="text-xs text-amber-700">
+            Para melhor resultado, use uma imagem horizontal com resolução mínima de 1280×720 pixels.
+          </p>
         </div>
       </Card>
     </div>
