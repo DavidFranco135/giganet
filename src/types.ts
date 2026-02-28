@@ -10,8 +10,8 @@ export interface UserProfile {
   statusConexao: 'online' | 'offline' | 'blocked';
   numeroCliente: string;
   telefone: string;
-  fotoUrl?: string;        // ← URL da foto de perfil (ImgBB)
-  ixcId?: string;          // ← ID do cliente no IXC Soft
+  fotoUrl?: string;
+  ixcId?: string;
   endereco: {
     rua: string;
     numero: string;
@@ -20,7 +20,7 @@ export interface UserProfile {
     cep: string;
   };
   asaasId?: string;
-  ultimoDesbloqueio?: any; // Firestore Timestamp
+  ultimoDesbloqueio?: Date | null;
 }
 
 export interface Plan {
@@ -30,7 +30,7 @@ export interface Plan {
   valor: number;
   beneficios: string[];
   popular?: boolean;
-  imagemUrl?: string;      // ← URL da imagem do plano (ImgBB)
+  imagemUrl?: string;
 }
 
 export interface Invoice {
@@ -56,4 +56,24 @@ export interface Ticket {
     text: string;
     timestamp: string;
   }[];
+}
+
+export interface Announcement {
+  id: string;
+  titulo: string;
+  descricao?: string;
+  imagemUrl: string;
+  link?: string;
+  ativo: boolean;
+  ordem: number;
+  criadoEm: string;
+}
+
+export interface DeviceImage {
+  id: string;
+  nome: string;
+  descricao?: string;
+  imagemUrl: string;
+  ativo: boolean;
+  criadoEm: string;
 }
