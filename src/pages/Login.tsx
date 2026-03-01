@@ -201,24 +201,22 @@ export const LoginPage: React.FC = () => {
                 Esqueceu sua senha?
               </button>
             )}
+
+            {/* Marca registrada */}
+            <p style={{
+              marginTop: '18px',
+              fontSize: '11px',
+              color: loginBgUrl ? 'rgba(255,255,255,0.45)' : '#cbd5e1',
+              letterSpacing: '0.06em',
+              userSelect: 'none',
+            }}>
+              Produzido por ®Niklaus
+            </p>
           </div>
         </form>
 
         </div>{/* fim .login-glass */}
       </div>
-
-      {/* Marca registrada */}
-      <p style={{
-        position: 'relative', zIndex: 1,
-        marginTop: '20px',
-        fontSize: '11px',
-        color: loginBgUrl ? 'rgba(255,255,255,0.50)' : '#94a3b8',
-        textShadow: loginBgUrl ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
-        letterSpacing: '0.06em',
-        userSelect: 'none',
-      }}>
-        Produzido por ®Niklaus
-      </p>
 
     </div>
   );
