@@ -58,12 +58,16 @@
   .slide-1 .bg-circles span:nth-child(2) { width: 400px; height: 400px; bottom: -100px; left: -100px; }
   .slide-1 .bg-circles span:nth-child(3) { width: 200px; height: 200px; top: 40%; left: 20%; background: rgba(0,180,216,0.08); }
 
-  .logo-circle {
-    width: 130px; height: 130px; border-radius: 50%;
+ .logo-circle {
+    /* Dobrado de 130px para 260px */
+    width: 260px;
+    height: 260px;
+    
+    border-radius: 50%;
     background: white;
     display: flex; align-items: center; justify-content: center;
     font-size: 52px; font-weight: 900; color: var(--blue);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.35);
     margin: 0 auto 28px;
     letter-spacing: -2px;
   }
