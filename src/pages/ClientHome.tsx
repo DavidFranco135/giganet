@@ -8,8 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { getDocs, query, where, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { getDocs } from 'firebase/firestore';
 import { Col } from '../lib/tenant';
 import { getAvatarUrl } from '../lib/imgbbService';
 import type { Announcement, DeviceImage } from '../types';
@@ -99,17 +98,26 @@ const AnnouncementGallery: React.FC = () => {
   const [items, setItems]     = useState<Announcement[]>([]);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [debugMsg, setDebugMsg] = useState('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const snap = await getDocs(
-          query(Col.announcements(), where('ativo', '==', true), orderBy('ordem', 'asc'))
-        );
-        setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
-      } catch { /* ignora */ }
-      finally { setLoading(false); }
+        const colRef = Col.announcements();
+        console.log('[Anúncios] Buscando em:', colRef.path);
+        const snap = await getDocs(colRef);
+        console.log('[Anúncios] Total docs:', snap.size);
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
+        const ativos = all
+          .filter(a => a.ativo === true)
+          .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+        setDebugMsg(`📂 ${colRef.path} | ${snap.size} docs | ${ativos.length} ativos`);
+        setItems(ativos);
+      } catch (e) {
+        console.error('[Anúncios] ERRO:', e);
+        setDebugMsg(`❌ Erro: ${String(e)}`);
+      } finally { setLoading(false); }
     })();
   }, []);
 
@@ -125,7 +133,11 @@ const AnnouncementGallery: React.FC = () => {
   };
 
   if (loading) return <div className="h-44 rounded-2xl bg-slate-100 animate-pulse" />;
-  if (items.length === 0) return null;
+  if (items.length === 0) return (
+    <div style={{ padding: '10px 14px', borderRadius: 12, background: '#f8faff', border: '1px solid #e2eaff', fontSize: 11, color: '#94a3b8' }}>
+      {debugMsg || '📭 Nenhum anúncio ativo'}
+    </div>
+  );
 
   const item = items[current];
   return (
@@ -183,7 +195,11 @@ const DeviceCarousel: React.FC = () => {
   }, []);
 
   if (loading) return <div className="h-36 rounded-2xl bg-slate-100 animate-pulse" />;
-  if (items.length === 0) return null;
+  if (items.length === 0) return (
+    <div style={{ padding: '10px 14px', borderRadius: 12, background: '#f8faff', border: '1px solid #e2eaff', fontSize: 11, color: '#94a3b8' }}>
+      {debugMsg || '📭 Nenhum anúncio ativo'}
+    </div>
+  );
 
   const item = items[current];
   return (
