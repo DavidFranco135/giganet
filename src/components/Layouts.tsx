@@ -6,6 +6,7 @@ import {
   Menu, X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { auth, db }    from '../lib/firebase';
+import { Doc } from '../lib/tenant';
 import { doc, getDoc } from 'firebase/firestore';
 import { cn }          from '../components/UI';
 import { AvatarCircle } from '../components/AvatarCircle';
@@ -23,7 +24,7 @@ const TOPBAR_H    = 56;    // altura da topbar mobile (px)
 function useAdminLogo() {
   const [url, setUrl] = useState('');
   useEffect(() => {
-    getDoc(doc(db, 'adminSettings', 'profile'))
+    getDoc(Doc.profile())
       .then(s => { if (s.exists() && s.data()?.avatarUrl) setUrl(s.data().avatarUrl); })
       .catch(() => {});
   }, []);
