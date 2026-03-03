@@ -473,13 +473,13 @@ const TabDispositivos: React.FC = () => {
   };
 
   const toggleAtivo = async (d: DeviceImage) => {
-    await updateDoc(doc(db, 'deviceImages', d.id), { ativo: !d.ativo });
+    await updateDoc(doc(Col.deviceImages(), d.id), { ativo: !d.ativo });
     setDevices(prev => prev.map(x => x.id === d.id ? { ...x, ativo: !x.ativo } : x));
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Remover este dispositivo?')) return;
-    await deleteDoc(doc(db, 'deviceImages', id));
+    await deleteDoc(doc(Col.deviceImages(), id));
     setDevices(prev => prev.filter(x => x.id !== id));
   };
 
@@ -548,7 +548,7 @@ const TabPlanos: React.FC = () => {
   }, []);
 
   const handleUploaded = async (planId: string, url: string) => {
-    await updateDoc(doc(db, 'plans', planId), { imagemUrl: url });
+    await updateDoc(doc(Col.plans(), planId), { imagemUrl: url });
     setPlans(prev => prev.map(p => p.id === planId ? { ...p, imagemUrl: url } : p));
   };
 
@@ -611,13 +611,13 @@ const TabAnuncios: React.FC = () => {
   };
 
   const toggleAtivo = async (a: Announcement) => {
-    await updateDoc(doc(db, 'announcements', a.id), { ativo: !a.ativo });
+    await updateDoc(doc(Col.announcements(), a.id), { ativo: !a.ativo });
     setAnuncios(prev => prev.map(x => x.id === a.id ? { ...x, ativo: !x.ativo } : x));
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Remover este anúncio?')) return;
-    await deleteDoc(doc(db, 'announcements', id));
+    await deleteDoc(doc(Col.announcements(), id));
     setAnuncios(prev => prev.filter(a => a.id !== id));
   };
 
