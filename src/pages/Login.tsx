@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
+import { Doc } from '../lib/tenant';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Button, Input, Card } from '../components/UI';
 import { useNavigate } from 'react-router-dom';
@@ -29,7 +30,7 @@ export const LoginPage: React.FC = () => {
   const [logoUrl,   setLogoUrl  ] = useState('');
   const [loginBgUrl, setLoginBgUrl] = useState('');
   useEffect(() => {
-    getDoc(doc(db, 'adminSettings', 'profile'))
+    getDoc(Doc.profile())
       .then(snap => {
         if (snap.exists()) {
           const d = snap.data();
@@ -65,7 +66,7 @@ export const LoginPage: React.FC = () => {
       if (isRegistering) {
         const cred    = await createUserWithEmailAndPassword(auth, email, password);
         const isAdmin = email === 'giganetadm@gmail.com';
-        await setDoc(doc(db, 'users', cred.user.uid), {
+        await setDoc(Doc.user(cred.user.uid), {
           uid: cred.user.uid, nome, email, cpf,
           tipo: isAdmin ? 'admin' : 'client',
           statusConexao: 'offline',
