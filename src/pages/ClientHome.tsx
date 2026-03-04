@@ -93,34 +93,33 @@ const DesbloqueioModal: React.FC<{ open: boolean; onClose: () => void }> = ({ op
   );
 };
 
-// ── Galeria de Anúncios ─────────────────────────────────────────
+// ── Galeria de Anúncios — slide com imagem inteira ──────────────
 const AnnouncementGallery: React.FC = () => {
   const [items, setItems]     = useState<Announcement[]>([]);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [debugMsg, setDebugMsg] = useState('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Suporte a arrastar/swipe
+  const dragStart = useRef<number | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
         const colRef = Col.announcements();
-        console.log('[Anúncios] Buscando em:', colRef.path);
-        const snap = await getDocs(colRef);
-        console.log('[Anúncios] Total docs:', snap.size);
-        const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
+        const snap   = await getDocs(colRef);
+        const all    = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
         const ativos = all
           .filter(a => a.ativo === true)
           .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
-        setDebugMsg(`📂 ${colRef.path} | ${snap.size} docs | ${ativos.length} ativos`);
         setItems(ativos);
       } catch (e) {
         console.error('[Anúncios] ERRO:', e);
-        setDebugMsg(`❌ Erro: ${String(e)}`);
       } finally { setLoading(false); }
     })();
   }, []);
 
+  // Auto-avanço a cada 5 s
   useEffect(() => {
     if (items.length < 2) return;
     timerRef.current = setTimeout(() => setCurrent(c => (c + 1) % items.length), 5000);
@@ -132,42 +131,97 @@ const AnnouncementGallery: React.FC = () => {
     setCurrent(c => (c + dir + items.length) % items.length);
   };
 
-  if (loading) return <div className="h-44 rounded-2xl bg-slate-100 animate-pulse" />;
-  if (items.length === 0) return (
-    <div style={{ padding: '10px 14px', borderRadius: 12, background: '#f8faff', border: '1px solid #e2eaff', fontSize: 11, color: '#94a3b8' }}>
-      {debugMsg || '📭 Nenhum anúncio ativo'}
-    </div>
-  );
+  // Handlers de arrastar (mouse + touch)
+  const onDragStart = (clientX: number) => { dragStart.current = clientX; };
+  const onDragEnd   = (clientX: number) => {
+    if (dragStart.current === null) return;
+    const delta = dragStart.current - clientX;
+    if (Math.abs(delta) > 40) go(delta > 0 ? 1 : -1);
+    dragStart.current = null;
+  };
+
+  if (loading) return <div className="rounded-2xl bg-slate-100 animate-pulse" style={{ height: 220 }} />;
+  if (items.length === 0) return null;  // some silenciosamente se não há anúncios
 
   const item = items[current];
+
   return (
-    <div className="relative overflow-hidden rounded-2xl shadow-sm">
+    <div
+      className="relative overflow-hidden rounded-2xl shadow-md select-none"
+      // Arrastar com mouse
+      onMouseDown={e  => onDragStart(e.clientX)}
+      onMouseUp={e    => onDragEnd(e.clientX)}
+      onMouseLeave={() => { dragStart.current = null; }}
+      // Swipe touch
+      onTouchStart={e => onDragStart(e.touches[0].clientX)}
+      onTouchEnd={e   => onDragEnd(e.changedTouches[0].clientX)}
+    >
       <AnimatePresence mode="wait">
-        <motion.div key={item.id} initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -60 }} transition={{ duration: 0.3 }}>
-          <img src={item.imagemUrl} alt={item.titulo} className="w-full h-44 object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex flex-col justify-end p-4">
-            <p className="text-white font-bold leading-tight">{item.titulo}</p>
-            {item.descricao && <p className="text-white/80 text-xs mt-0.5">{item.descricao}</p>}
+        <motion.div
+          key={item.id}
+          initial={{ opacity: 0, x: 60 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -60 }}
+          transition={{ duration: 0.3 }}
+          style={{ position: 'relative' }}
+        >
+          {/* ── Imagem inteira (object-contain) ── */}
+          <div style={{ width: '100%', backgroundColor: '#0a0a0a' }}>
+            <img
+              src={item.imagemUrl}
+              alt={item.titulo}
+              draggable={false}
+              style={{
+                width:      '100%',
+                display:    'block',
+                objectFit:  'contain',       // imagem completa, sem corte
+                maxHeight:  '420px',         // limite razoável em telas grandes
+              }}
+            />
+          </div>
+
+          {/* Gradiente + texto sobre a imagem */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex flex-col justify-end p-4 pointer-events-none">
+            <p className="text-white font-bold leading-tight drop-shadow">{item.titulo}</p>
+            {item.descricao && <p className="text-white/80 text-xs mt-0.5 drop-shadow">{item.descricao}</p>}
             {item.link && (
-              <a href={item.link} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-xs text-white/90 hover:text-white font-medium underline w-fit">
+              <a
+                href={item.link}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1.5 inline-flex items-center gap-1 text-xs text-white/90 hover:text-white font-medium underline w-fit pointer-events-auto"
+              >
                 Saiba mais <ExternalLink className="h-3 w-3" />
               </a>
             )}
           </div>
         </motion.div>
       </AnimatePresence>
+
+      {/* Botões de navegar (visíveis quando há mais de 1 anúncio) */}
       {items.length > 1 && (
         <>
-          <button onClick={() => go(-1)} className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/30 hover:bg-black/50 flex items-center justify-center text-white backdrop-blur-sm transition-colors">
-            <ChevronLeft className="h-4 w-4" />
+          <button
+            onClick={() => go(-1)}
+            className="absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white backdrop-blur-sm transition-colors z-10"
+          >
+            <ChevronLeft className="h-5 w-5" />
           </button>
-          <button onClick={() => go(1)} className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/30 hover:bg-black/50 flex items-center justify-center text-white backdrop-blur-sm transition-colors">
-            <ChevronRight className="h-4 w-4" />
+          <button
+            onClick={() => go(1)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white backdrop-blur-sm transition-colors z-10"
+          >
+            <ChevronRight className="h-5 w-5" />
           </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+
+          {/* Dots indicadores */}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
             {items.map((_, i) => (
-              <button key={i} onClick={() => { if (timerRef.current) clearTimeout(timerRef.current); setCurrent(i); }}
-                className={cn('h-1.5 rounded-full transition-all', i === current ? 'bg-white w-5' : 'bg-white/50 w-1.5')} />
+              <button
+                key={i}
+                onClick={() => { if (timerRef.current) clearTimeout(timerRef.current); setCurrent(i); }}
+                className={cn('h-1.5 rounded-full transition-all', i === current ? 'bg-white w-5' : 'bg-white/50 w-1.5')}
+              />
             ))}
           </div>
         </>
@@ -195,11 +249,7 @@ const DeviceCarousel: React.FC = () => {
   }, []);
 
   if (loading) return <div className="h-36 rounded-2xl bg-slate-100 animate-pulse" />;
-  if (items.length === 0) return (
-    <div style={{ padding: '10px 14px', borderRadius: 12, background: '#f8faff', border: '1px solid #e2eaff', fontSize: 11, color: '#94a3b8' }}>
-      {debugMsg || '📭 Nenhum anúncio ativo'}
-    </div>
-  );
+  if (items.length === 0) return null;
 
   const item = items[current];
   return (
@@ -278,7 +328,7 @@ export const ClientHome: React.FC = () => {
         </button>
       </header>
 
-      {/* Galeria de anúncios — some se não houver banners */}
+      {/* Galeria de anúncios — imagem inteira, botões arrastar */}
       <AnnouncementGallery />
 
       {/* Status + Fatura */}
