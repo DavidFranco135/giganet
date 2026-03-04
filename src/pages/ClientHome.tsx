@@ -140,12 +140,13 @@ const AnnouncementGallery: React.FC = () => {
     dragStart.current = null;
   };
 
+  const [imgLoaded, setImgLoaded] = useState(false);
+  useEffect(() => { setImgLoaded(false); }, [current]);
+
   if (loading) return <div className="rounded-2xl bg-slate-100 animate-pulse" style={{ height: 220 }} />;
   if (items.length === 0) return null;  // some silenciosamente se não há anúncios
 
   const item = items[current];
-  const [imgLoaded, setImgLoaded] = useState(false);
-  useEffect(() => { setImgLoaded(false); }, [current]);
 
   return (
     <div
