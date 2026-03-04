@@ -5,7 +5,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Cada provedor é isolado ──────────────────────────────────
+    // ── Cada provedor é completamente isolado ────────────────────
     match /provedores/{provedorId} {
 
       // Settings/profile — leitura pública (logo, capa, bg login)
@@ -16,47 +16,52 @@ service cloud.firestore {
       }
 
       // Users — cada cliente lê/escreve apenas seus próprios dados
-      // Admin do provedor lê todos
+      // Admin do provedor lê/edita todos dentro do mesmo provedor
       match /users/{userId} {
-        allow read:  if request.auth.uid == userId
-                     || isAdminOf(provedorId);
-        allow create: if request.auth.uid == userId;
-        allow update: if request.auth.uid == userId
-                     || isAdminOf(provedorId);
+        allow read:   if request.auth != null &&
+                        (request.auth.uid == userId || isAdminOf(provedorId));
+        allow create: if request.auth != null &&
+                        request.auth.uid == userId;
+        allow update: if request.auth != null &&
+                        (request.auth.uid == userId || isAdminOf(provedorId));
         allow delete: if isAdminOf(provedorId);
       }
 
-      // Anúncios — leitura pública, escrita apenas admin
+      // Anúncios — leitura para usuários autenticados, escrita só admin
       match /announcements/{docId} {
         allow read:  if request.auth != null;
         allow write: if isAdminOf(provedorId);
       }
 
-      // Dispositivos — leitura pública, escrita apenas admin
+      // Dispositivos — leitura para autenticados, escrita só admin
       match /deviceImages/{docId} {
         allow read:  if request.auth != null;
         allow write: if isAdminOf(provedorId);
       }
 
-      // Planos — leitura pública, escrita apenas admin
+      // Planos — leitura pública, escrita só admin
       match /plans/{docId} {
         allow read:  if true;
         allow write: if isAdminOf(provedorId);
       }
 
-      // Chamados — cliente lê/cria os seus, admin lê todos
+      // Chamados — cliente lê/cria os seus, admin lê/edita todos
       match /tickets/{docId} {
-        allow read:  if resource.data.uid == request.auth.uid
-                     || isAdminOf(provedorId);
+        allow read:   if request.auth != null &&
+                        (resource == null ||
+                         resource.data.uid == request.auth.uid ||
+                         isAdminOf(provedorId));
         allow create: if request.auth != null;
         allow update: if isAdminOf(provedorId);
         allow delete: if isAdminOf(provedorId);
       }
     }
 
-    // ── Função: verifica se o usuário é admin do provedor ────────
+    // ── Função: verifica se o usuário autenticado é admin do provedor ──
+    // Lê o documento do usuário dentro do provedor específico
     function isAdminOf(provedorId) {
       return request.auth != null &&
+        exists(/databases/$(database)/documents/provedores/$(provedorId)/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/provedores/$(provedorId)/users/$(request.auth.uid)).data.tipo == 'admin';
     }
   }
