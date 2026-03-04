@@ -225,46 +225,7 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Gerenciar imagens dos planos */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">Imagens dos Planos</h3>
-            <p className="text-sm text-slate-500">Clique em um plano para adicionar ou trocar a imagem (hospedado no ImgBB)</p>
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {plans.map(plan => (
-            <div
-              key={plan.id}
-              className="relative rounded-xl overflow-hidden border border-slate-100 cursor-pointer hover:shadow-md transition-all group"
-              onClick={() => setPlanModal(plan)}
-            >
-              {/* Imagem ou placeholder */}
-              <div className="h-32 bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
-                {planImages[plan.id] ? (
-                  <img src={planImages[plan.id]} alt={plan.nome} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400">
-                    <ImageIcon className="h-8 w-8" />
-                    <span className="text-xs">Sem imagem</span>
-                  </div>
-                )}
-                {/* Overlay ao hover */}
-                <div className="absolute inset-0 bg-primary/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <div className="flex items-center gap-2 text-white text-sm font-medium">
-                    <Upload className="h-4 w-4" />
-                    {planImages[plan.id] ? 'Trocar imagem' : 'Adicionar imagem'}
-                  </div>
-                </div>
-              </div>
-              <div className="p-3">
-                <p className="font-semibold text-slate-900 text-sm">{plan.nome}</p>
-                <p className="text-xs text-slate-500">{plan.velocidade} · R$ {plan.valor.toFixed(2)}/mês</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+     
 
       {/* Últimos chamados */}
       <Card className="p-6">
