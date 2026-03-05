@@ -184,7 +184,7 @@ export const LoginPage: React.FC = () => {
             className="mt-4 text-2xl font-bold"
             style={{ color: loginBgUrl ? 'white' : '#0f172a', textShadow: loginBgUrl ? '0 1px 4px rgba(0,0,0,0.4)' : 'none' }}
           >
-            NIKLAUS
+            GIGA NET
           </h1>
           <p
             className="text-sm mt-1"
